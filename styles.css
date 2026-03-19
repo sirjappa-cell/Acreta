@@ -209,6 +209,15 @@ button {
   color: #d7cedf;
 }
 
+.setup-warning {
+  margin: 16px 0 0;
+  padding: 12px 14px;
+  border: 1px solid rgba(221, 27, 52, 0.24);
+  border-radius: 14px;
+  color: #ffd5dc;
+  background: rgba(221, 27, 52, 0.1);
+}
+
 .page-shell {
   position: relative;
   z-index: 1;
