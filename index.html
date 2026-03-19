@@ -7,66 +7,7 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <div class="background-stage" aria-hidden="true">
-    <div class="mist mist--one"></div>
-    <div class="mist mist--two"></div>
-    <div class="rain rain--back"></div>
-    <div class="rain rain--front"></div>
-    <div class="pulse pulse--left"></div>
-    <div class="pulse pulse--right"></div>
-  </div>
-
-  <div id="auth-gate" class="auth-gate">
-    <div class="auth-panel">
-      <p class="auth-panel__eyebrow">Acesso restrito</p>
-      <h1 class="auth-panel__title">Acreta</h1>
-      <p class="auth-panel__text">
-        Cadastre-se para entrar no fórum e guardar seus contos em um perfil real do Supabase.
-      </p>
-      <p id="setup-warning" class="setup-warning is-hidden"></p>
-
-      <div class="auth-switch">
-        <button id="show-login" class="filter-chip is-active" type="button">Entrar</button>
-        <button id="show-register" class="filter-chip" type="button">Cadastrar</button>
-      </div>
-
-      <form id="login-form" class="auth-form">
-        <label>
-          <span>E-mail</span>
-          <input name="email" type="email" maxlength="120" placeholder="voce@email.com" required>
-        </label>
-        <label>
-          <span>Senha</span>
-          <input name="password" type="password" maxlength="80" placeholder="Sua senha" required>
-        </label>
-        <button class="button button--primary" type="submit">Entrar no Acreta</button>
-      </form>
-
-      <form id="register-form" class="auth-form is-hidden">
-        <label>
-          <span>ID visível</span>
-          <input name="username" type="text" maxlength="24" placeholder="Como seu perfil vai aparecer" required>
-        </label>
-        <label>
-          <span>E-mail</span>
-          <input name="email" type="email" maxlength="120" placeholder="voce@email.com" required>
-        </label>
-        <label>
-          <span>Senha</span>
-          <input name="password" type="password" maxlength="80" placeholder="Crie sua senha" required>
-        </label>
-        <label>
-          <span>Confirmar senha</span>
-          <input name="confirmPassword" type="password" maxlength="80" placeholder="Repita sua senha" required>
-        </label>
-        <button class="button button--primary" type="submit">Criar conta</button>
-      </form>
-
-      <p id="auth-feedback" class="auth-feedback" aria-live="polite"></p>
-    </div>
-  </div>
-
-  <div id="app-shell" class="page-shell is-locked" aria-hidden="true">
+  <div class="page-shell">
     <header class="hero">
       <div class="hero__veil"></div>
       <nav class="topbar">
@@ -74,25 +15,19 @@
           <span class="brand__mark">A</span>
           <div>
             <p class="brand__eyebrow">Comunidade de histórias sombrias</p>
-            <h1 class="brand__title">Acreta</h1>
+            <h1>Acreta</h1>
           </div>
         </div>
-        <div class="topbar__controls">
-          <div class="session-user">
-            <img id="session-avatar" class="session-avatar" alt="Foto do perfil">
-            <p id="session-indicator" class="session-indicator"></p>
-          </div>
-          <button id="logout-button" class="topbar__action" type="button">Sair</button>
-        </div>
+        <button class="topbar__action" type="button">Entrar na névoa</button>
       </nav>
 
       <section class="hero__content">
         <div class="hero__copy">
-          <p class="hero__tag">Contos obscuros, ruído de chuva e fundo vivo</p>
-          <h2>Publique terror, ficção sombria e paranoia psicológica em grupos próprios.</h2>
+          <p class="hero__tag">Postagens no estilo fórum, com clima de pesadelo</p>
+          <h2>Publique contos de terror, ficção sombria e paranoia psicológica em grupos próprios.</h2>
           <p class="hero__text">
-            O Acreta agora pode usar autenticação e dados reais no Supabase, mantendo o clima pesado,
-            o feed compartilhado e o perfil persistido entre usuários.
+            O Acreta simula uma experiência inspirada em comunidades tipo Reddit, com feed, votação visual,
+            criação rápida de posts e 10 grupos temáticos para organizar cada história.
           </p>
           <div class="hero__stats">
             <article>
@@ -100,92 +35,29 @@
               <span>grupos de exemplo</span>
             </article>
             <article>
-              <strong>Online</strong>
-              <span>postagens compartilhadas</span>
+              <strong>100%</strong>
+              <span>em português BR</span>
             </article>
             <article>
-              <strong>Perfil</strong>
-              <span>ligado ao autor</span>
+              <strong>Local</strong>
+              <span>salvo no navegador</span>
             </article>
           </div>
         </div>
 
         <aside class="hero__panel">
-          <p class="panel__label">Ambiente ritual</p>
+          <p class="panel__label">Tópicos em destaque</p>
           <ul class="spotlight-list">
-            <li>Fundo animado com chuva, névoa e pulsos vermelhos discretos.</li>
-            <li>Grupos separados por subgênero para não misturar o clima dos relatos.</li>
-            <li>Player para ativar ou pausar uma ambientação de chuva no navegador.</li>
+            <li>Relatos que começam normais e terminam irreconhecíveis.</li>
+            <li>Grupos separados por subgênero para não misturar clima e público.</li>
+            <li>Publicação rápida com título, grupo, texto e tags livres.</li>
           </ul>
-
-          <div class="audio-panel">
-            <div>
-              <p class="audio-panel__title">Som ambiente</p>
-              <p class="audio-panel__text">Ative chuva contínua para ler ou escrever no escuro.</p>
-            </div>
-            <div class="audio-panel__controls">
-              <button id="rain-toggle" class="button button--secondary" type="button">Ativar chuva</button>
-              <label class="volume-wrap" for="rain-volume">
-                <span>Volume</span>
-                <input id="rain-volume" type="range" min="0" max="100" value="35">
-              </label>
-            </div>
-            <p id="audio-status" class="audio-panel__status" aria-live="polite">Áudio desligado.</p>
-          </div>
         </aside>
       </section>
     </header>
 
     <main class="layout">
       <aside class="sidebar">
-        <section class="card card--profile">
-          <div class="card__header">
-            <h3>Perfil</h3>
-            <span>autor atual</span>
-          </div>
-          <div class="profile-box">
-            <div class="profile-box__head">
-              <img id="profile-preview-avatar" class="profile-preview-avatar" alt="Foto do perfil">
-              <div>
-                <p id="profile-name" class="profile-box__name"></p>
-                <p id="profile-email" class="profile-box__text"></p>
-              </div>
-            </div>
-            <div class="profile-box__stats">
-              <article>
-                <strong id="profile-post-count">0</strong>
-                <span>contos</span>
-              </article>
-            </div>
-          </div>
-        </section>
-
-        <section class="card card--profile-edit">
-          <div class="card__header">
-            <h3>Editar perfil</h3>
-            <span>identidade</span>
-          </div>
-          <form id="profile-form" class="profile-form">
-            <label>
-              <span>ID visível</span>
-              <input id="display-name" name="displayName" type="text" maxlength="28" placeholder="Nome visível do perfil">
-            </label>
-            <label>
-              <span>Cor das letras</span>
-              <input id="text-color" name="textColor" type="color" value="#f5eef8">
-            </label>
-            <label>
-              <span>Foto de perfil</span>
-              <input id="avatar-file" name="avatarFile" type="file" accept="image/*">
-            </label>
-            <div class="profile-form__actions">
-              <button class="button button--primary" type="submit">Salvar perfil</button>
-              <button id="reset-avatar" class="button button--secondary" type="button">Remover foto</button>
-            </div>
-            <p id="profile-feedback" class="composer__feedback" aria-live="polite"></p>
-          </form>
-        </section>
-
         <section class="card card--groups">
           <div class="card__header">
             <h3>Grupos</h3>
@@ -199,9 +71,9 @@
             <h3>Como funciona</h3>
           </div>
           <ul class="about-list">
-            <li>O Acreta funciona apenas como um fórum para escrever e compartilhar histórias e contos.</li>
-            <li>Somente usuários cadastrados podem acessar e publicar no site.</li>
-            <li>Os contos ficam salvos no perfil do autor que os publicou.</li>
+            <li>Escolha um grupo antes de publicar.</li>
+            <li>Os posts ficam salvos no seu navegador com `localStorage`.</li>
+            <li>O feed principal mostra os relatos mais recentes primeiro.</li>
           </ul>
         </section>
       </aside>
@@ -210,7 +82,7 @@
         <section class="card composer">
           <div class="card__header">
             <h3>Criar novo relato</h3>
-            <span>Publicação rápida</span>
+            <span>Formato estilo comunidade</span>
           </div>
 
           <form id="post-form" class="composer__form">
@@ -227,7 +99,7 @@
 
               <label>
                 <span>Autor</span>
-                <input id="author" name="author" type="text" maxlength="28" required readonly>
+                <input id="author" name="author" type="text" maxlength="28" placeholder="Seu nome ou apelido" required>
               </label>
             </div>
 
@@ -238,7 +110,7 @@
 
             <label>
               <span>Texto</span>
-              <textarea id="content" name="content" rows="7" maxlength="1600" placeholder="Escreva seu relato em português BR..." required></textarea>
+              <textarea id="content" name="content" rows="18" placeholder="Escreva seu relato em português BR..." required></textarea>
             </label>
 
             <div class="composer__actions">
@@ -258,38 +130,27 @@
             <button class="filter-chip is-active" type="button" data-filter="all">Todos</button>
             <button class="filter-chip" type="button" data-filter="recent">Recentes</button>
             <button class="filter-chip" type="button" data-filter="long">Longos</button>
-            <button class="filter-chip" type="button" data-filter="mine">Meus contos</button>
           </div>
         </section>
 
         <section id="post-feed" class="post-feed"></section>
       </section>
     </main>
-
-    <footer class="site-footer">
-      <p>Criado por gabriel keil fabio e miguel</p>
-    </footer>
   </div>
 
   <template id="post-template">
     <article class="post-card">
       <div class="vote-rail" aria-hidden="true">
-        <button class="vote-button vote-button--up" type="button">▲</button>
+        <button type="button">▲</button>
         <span class="vote-score"></span>
-        <button class="vote-button vote-button--down" type="button">▼</button>
+        <button type="button">▼</button>
       </div>
 
       <div class="post-card__body">
-        <div class="post-head">
-          <img class="post-avatar" alt="Foto do perfil do autor">
-          <div>
-            <div class="post-meta">
-              <span class="post-group"></span>
-              <span class="post-author"></span>
-              <span class="post-date"></span>
-            </div>
-            <p class="post-owner"></p>
-          </div>
+        <div class="post-meta">
+          <span class="post-group"></span>
+          <span class="post-author"></span>
+          <span class="post-date"></span>
         </div>
 
         <h4 class="post-title"></h4>
@@ -299,8 +160,6 @@
     </article>
   </template>
 
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="supabase-config.js"></script>
   <script src="script.js"></script>
 </body>
 </html>

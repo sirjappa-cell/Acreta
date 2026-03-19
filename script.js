@@ -1,62 +1,114 @@
-const DEFAULT_AVATAR =
-  "data:image/svg+xml;utf8," +
-  encodeURIComponent(`
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
-      <defs>
-        <linearGradient id="g" x1="0" x2="1" y1="0" y2="1">
-          <stop offset="0%" stop-color="#53218f"/>
-          <stop offset="100%" stop-color="#dd1b34"/>
-        </linearGradient>
-      </defs>
-      <rect width="120" height="120" rx="60" fill="url(#g)"/>
-      <circle cx="60" cy="44" r="22" fill="#f5eef8" opacity="0.9"/>
-      <path d="M24 102c6-18 22-28 36-28s30 10 36 28" fill="#f5eef8" opacity="0.9"/>
-    </svg>
-  `);
+const STORAGE_KEY = "acreta-posts-v1";
+const DB_NAME = "acreta-db";
+const DB_VERSION = 1;
+const POSTS_STORE = "posts";
 
-const GROUPS = [
-  { id: "todos", nome: "Todos", descricao: "Visão geral com tudo o que foi publicado." },
-  { id: "terror-classico", nome: "Terror Clássico", descricao: "Casarões, vultos, maldições e atmosfera gótica." },
-  { id: "ficcao-sombria", nome: "Ficção Sombria", descricao: "Sci-fi macabra, tecnologia hostil e futuros doentes." },
-  { id: "horror-psicologico", nome: "Horror Psicológico", descricao: "Paranoia, memória falha e terror interno." },
-  { id: "folk-horror", nome: "Folk Horror", descricao: "Vilarejos isolados, ritos antigos e natureza ameaçadora." },
-  { id: "investigacao", nome: "Investigação Maldita", descricao: "Diários, fitas, fóruns apagados e pistas proibidas." },
-  { id: "sobrenatural-urbano", nome: "Sobrenatural Urbano", descricao: "Metrôs, prédios, becos e horrores da cidade." },
-  { id: "creepypasta", nome: "Creepypasta", descricao: "Relatos curtos, virais e perturbadores." },
-  { id: "cosmico", nome: "Horror Cósmico", descricao: "Entidades imensas, insignificância e ruína mental." },
-  { id: "corpo", nome: "Body Horror", descricao: "Transformações grotescas e carne fora de controle." },
-  { id: "pesadelos-reais", nome: "Pesadelos Reais", descricao: "Relatos plausíveis, crimes estranhos e medo do cotidiano." }
+const groups = [
+  {
+    id: "todos",
+    nome: "Todos",
+    descricao: "Visão geral com tudo o que foi publicado."
+  },
+  {
+    id: "terror-classico",
+    nome: "Terror Clássico",
+    descricao: "Casarões, vultos, maldições e atmosfera gótica."
+  },
+  {
+    id: "ficcao-sombria",
+    nome: "Ficção Sombria",
+    descricao: "Sci-fi macabra, tecnologia hostil e futuros doentes."
+  },
+  {
+    id: "horror-psicologico",
+    nome: "Horror Psicológico",
+    descricao: "Paranoia, memória falha e terror interno."
+  },
+  {
+    id: "folk-horror",
+    nome: "Folk Horror",
+    descricao: "Vilarejos isolados, ritos antigos e natureza ameaçadora."
+  },
+  {
+    id: "investigacao",
+    nome: "Investigação Maldita",
+    descricao: "Diários, fitas, fóruns apagados e pistas proibidas."
+  },
+  {
+    id: "sobrenatural-urbano",
+    nome: "Sobrenatural Urbano",
+    descricao: "Metrôs, prédios, becos e horrores da cidade."
+  },
+  {
+    id: "creepypasta",
+    nome: "Creepypasta",
+    descricao: "Relatos curtos, virais e perturbadores."
+  },
+  {
+    id: "cosmico",
+    nome: "Horror Cósmico",
+    descricao: "Entidades imensas, insignificância e ruína mental."
+  },
+  {
+    id: "corpo",
+    nome: "Body Horror",
+    descricao: "Transformações grotescas e carne fora de controle."
+  },
+  {
+    id: "pesadelos-reais",
+    nome: "Pesadelos Reais",
+    descricao: "Relatos plausíveis, crimes estranhos e medo do cotidiano."
+  }
+];
+
+const defaultPosts = [
+  {
+    id: crypto.randomUUID(),
+    group: "horror-psicologico",
+    title: "Meu reflexo piscou antes de mim",
+    author: "NoiteFixa",
+    content: "Fiquei sem energia por três horas. Quando acendi a lanterna do celular no banheiro, o espelho já mostrava meu rosto. O problema é que eu ainda estava no corredor.",
+    tags: ["espelho", "apartamento", "paranoia"],
+    votes: 187,
+    createdAt: "2026-03-16T23:48:00"
+  },
+  {
+    id: crypto.randomUUID(),
+    group: "ficcao-sombria",
+    title: "O elevador do laboratório desceu para um andar negativo que não existia",
+    author: "DrVeludo",
+    content: "O painel marcava -9. Nenhum de nós apertou esse botão. Quando a porta abriu, vimos uma ala inteira com nossas mesas, nossas fotos e os nossos corpos sentados, como se nunca tivéssemos saído dali.",
+    tags: ["laboratório", "sci-fi", "duplicatas"],
+    votes: 231,
+    createdAt: "2026-03-15T19:10:00"
+  },
+  {
+    id: crypto.randomUUID(),
+    group: "folk-horror",
+    title: "Na festa do milho ninguém pode olhar para o espantalho ao meio-dia",
+    author: "SertaoFrio",
+    content: "A regra parecia idiota até meu tio desobedecer. Quando o sino tocou, o espantalho estava usando a camisa dele. Meu tio continuou ao meu lado, mas já não lembrava o próprio nome.",
+    tags: ["vilarejo", "ritual", "campo"],
+    votes: 154,
+    createdAt: "2026-03-14T11:42:00"
+  },
+  {
+    id: crypto.randomUUID(),
+    group: "sobrenatural-urbano",
+    title: "A estação fechada apareceu no meio do trajeto",
+    author: "MetroVazio",
+    content: "Todo mundo no vagão fingiu não ver. As portas abriram numa plataforma coberta de azulejos vermelhos e anúncios sem rosto. Um menino entrou, sentou na minha frente e perguntou por que eu ainda tinha sombra.",
+    tags: ["metrô", "cidade", "fantasma"],
+    votes: 203,
+    createdAt: "2026-03-13T07:25:00"
+  }
 ];
 
 const state = {
   selectedGroup: "todos",
   filter: "all",
-  posts: [],
-  currentUser: null,
-  currentProfile: null,
-  votes: {}
+  posts: []
 };
-
-const supabaseUrl = window.ACRETA_SUPABASE_URL || "";
-const supabaseAnonKey = window.ACRETA_SUPABASE_ANON_KEY || "";
-const isSupabaseConfigured =
-  Boolean(supabaseUrl && supabaseAnonKey) &&
-  !supabaseUrl.includes("COLE_AQUI") &&
-  !supabaseAnonKey.includes("COLE_AQUI");
-
-const supabaseClient = isSupabaseConfigured
-  ? window.supabase.createClient(supabaseUrl, supabaseAnonKey)
-  : null;
-
-const authGateEl = document.querySelector("#auth-gate");
-const appShellEl = document.querySelector("#app-shell");
-const setupWarningEl = document.querySelector("#setup-warning");
-const showLoginEl = document.querySelector("#show-login");
-const showRegisterEl = document.querySelector("#show-register");
-const loginFormEl = document.querySelector("#login-form");
-const registerFormEl = document.querySelector("#register-form");
-const authFeedbackEl = document.querySelector("#auth-feedback");
-const logoutButtonEl = document.querySelector("#logout-button");
 
 const groupListEl = document.querySelector("#group-list");
 const groupSelectEl = document.querySelector("#group");
@@ -64,268 +116,57 @@ const postFeedEl = document.querySelector("#post-feed");
 const postTemplate = document.querySelector("#post-template");
 const feedTitleEl = document.querySelector("#feed-title");
 const formEl = document.querySelector("#post-form");
-const authorInputEl = document.querySelector("#author");
 const feedbackEl = document.querySelector("#form-feedback");
 const filterButtons = Array.from(document.querySelectorAll(".filter-chip"));
-const profileNameEl = document.querySelector("#profile-name");
-const profileEmailEl = document.querySelector("#profile-email");
-const profilePostCountEl = document.querySelector("#profile-post-count");
-const profilePreviewAvatarEl = document.querySelector("#profile-preview-avatar");
-const sessionIndicatorEl = document.querySelector("#session-indicator");
-const sessionAvatarEl = document.querySelector("#session-avatar");
-const profileFormEl = document.querySelector("#profile-form");
-const displayNameInputEl = document.querySelector("#display-name");
-const textColorInputEl = document.querySelector("#text-color");
-const avatarFileInputEl = document.querySelector("#avatar-file");
-const profileFeedbackEl = document.querySelector("#profile-feedback");
-const resetAvatarEl = document.querySelector("#reset-avatar");
-
-const rainToggleEl = document.querySelector("#rain-toggle");
-const rainVolumeEl = document.querySelector("#rain-volume");
-const audioStatusEl = document.querySelector("#audio-status");
-
-let audioContext = null;
-let rainNodes = null;
 
 renderGroupControls();
-bindAuthEvents();
-bindAppEvents();
-boot();
+bindEvents();
+void initApp();
 
-async function boot() {
-  if (!isSupabaseConfigured) {
-    setupWarningEl.textContent = "Preencha supabase-config.js com a URL e a chave anon do seu projeto.";
-    setupWarningEl.classList.remove("is-hidden");
-    authFeedbackEl.textContent = "Supabase ainda não configurado.";
-    return;
-  }
-
-  const { data } = await supabaseClient.auth.getSession();
-  await applySession(data.session);
-
-  supabaseClient.auth.onAuthStateChange(async (_event, session) => {
-    await applySession(session);
-  });
-}
-
-function bindAuthEvents() {
-  showLoginEl.addEventListener("click", () => {
-    showLoginEl.classList.add("is-active");
-    showRegisterEl.classList.remove("is-active");
-    loginFormEl.classList.remove("is-hidden");
-    registerFormEl.classList.add("is-hidden");
-    authFeedbackEl.textContent = "";
-  });
-
-  showRegisterEl.addEventListener("click", () => {
-    showRegisterEl.classList.add("is-active");
-    showLoginEl.classList.remove("is-active");
-    registerFormEl.classList.remove("is-hidden");
-    loginFormEl.classList.add("is-hidden");
-    authFeedbackEl.textContent = "";
-  });
-
-  loginFormEl.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    if (!supabaseClient) {
-      return;
-    }
-
-    const formData = new FormData(loginFormEl);
-    const email = String(formData.get("email")).trim();
-    const password = String(formData.get("password")).trim();
-
-    const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
-    if (error) {
-      authFeedbackEl.textContent = error.message;
-      return;
-    }
-
-    loginFormEl.reset();
-    authFeedbackEl.textContent = "";
-  });
-
-  registerFormEl.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    if (!supabaseClient) {
-      return;
-    }
-
-    const formData = new FormData(registerFormEl);
-    const username = normalizeUsername(formData.get("username"));
-    const email = String(formData.get("email")).trim();
-    const password = String(formData.get("password")).trim();
-    const confirmPassword = String(formData.get("confirmPassword")).trim();
-
-    if (username.length < 3) {
-      authFeedbackEl.textContent = "O ID visível precisa ter pelo menos 3 caracteres.";
-      return;
-    }
-
-    if (password.length < 6) {
-      authFeedbackEl.textContent = "A senha precisa ter pelo menos 6 caracteres.";
-      return;
-    }
-
-    if (password !== confirmPassword) {
-      authFeedbackEl.textContent = "As senhas não coincidem.";
-      return;
-    }
-
-    const { data, error } = await supabaseClient.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          username,
-          display_name: username
-        }
-      }
-    });
-
-    if (error) {
-      authFeedbackEl.textContent = error.message;
-      return;
-    }
-
-    registerFormEl.reset();
-    if (!data.session) {
-      authFeedbackEl.textContent = "Conta criada. Se o Supabase exigir confirmação de e-mail, confirme antes de entrar.";
-      return;
-    }
-
-    authFeedbackEl.textContent = "";
-  });
-
-  logoutButtonEl.addEventListener("click", async () => {
-    if (!supabaseClient) {
-      return;
-    }
-    await supabaseClient.auth.signOut();
-  });
-}
-
-function bindAppEvents() {
+function bindEvents() {
   formEl.addEventListener("submit", async (event) => {
     event.preventDefault();
-    if (!supabaseClient || !state.currentUser || !state.currentProfile) {
-      return;
-    }
 
     const formData = new FormData(formEl);
-    const title = String(formData.get("title")).trim();
-    const groupId = String(formData.get("group")).trim();
-    const content = String(formData.get("content")).trim();
-    const tags = String(formData.get("tags"))
-      .trim()
+    const title = String(formData.get("title") || "").trim();
+    const group = String(formData.get("group") || "").trim();
+    const author = String(formData.get("author") || "").trim();
+    const content = String(formData.get("content") || "").trim();
+    const tagsRaw = String(formData.get("tags") || "").trim();
+
+    const tags = tagsRaw
       .split(",")
       .map((tag) => tag.trim())
       .filter(Boolean)
       .slice(0, 6);
 
-    const payload = {
-      user_id: state.currentUser.id,
-      group_id: groupId,
+    const post = {
+      id: crypto.randomUUID(),
       title,
+      group,
+      author,
       content,
       tags,
-      author_display: state.currentProfile.display_name,
-      author_username: state.currentProfile.username,
-      author_text_color: state.currentProfile.text_color,
-      author_avatar_url: state.currentProfile.avatar_url || ""
+      votes: randomVoteCount(),
+      createdAt: new Date().toISOString()
     };
 
-    const { error } = await supabaseClient.from("posts").insert(payload);
-    if (error) {
-      feedbackEl.textContent = error.message;
-      return;
+    feedbackEl.textContent = "Salvando relato...";
+
+    try {
+      state.posts.unshift(post);
+      await savePosts(state.posts);
+      state.selectedGroup = group;
+      syncActiveGroup();
+      renderPosts();
+      formEl.reset();
+      feedbackEl.textContent = "Relato publicado no Acreta e salvo neste navegador.";
+      window.scrollTo({ top: document.querySelector(".feed-header").offsetTop - 24, behavior: "smooth" });
+    } catch (error) {
+      state.posts = state.posts.filter((item) => item.id !== post.id);
+      feedbackEl.textContent = "Não foi possível salvar esse relato longo neste navegador.";
+      console.error(error);
     }
-
-    formEl.reset();
-    authorInputEl.value = state.currentProfile.display_name;
-    feedbackEl.textContent = "Relato publicado com sucesso.";
-    state.selectedGroup = groupId;
-    syncActiveGroup();
-    await refreshData();
-  });
-
-  profileFormEl.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    if (!supabaseClient || !state.currentUser || !state.currentProfile) {
-      return;
-    }
-
-    const displayName = String(displayNameInputEl.value).trim() || state.currentProfile.display_name;
-    const textColor = normalizeColor(textColorInputEl.value);
-    const file = avatarFileInputEl.files?.[0];
-
-    let avatarUrl = state.currentProfile.avatar_url || "";
-    if (file) {
-      avatarUrl = await readFileAsDataUrl(file);
-    }
-
-    const updates = {
-      display_name: displayName,
-      text_color: textColor,
-      avatar_url: avatarUrl
-    };
-
-    const { error: profileError } = await supabaseClient
-      .from("profiles")
-      .update(updates)
-      .eq("id", state.currentUser.id);
-
-    if (profileError) {
-      profileFeedbackEl.textContent = profileError.message;
-      return;
-    }
-
-    const { error: postsError } = await supabaseClient
-      .from("posts")
-      .update({
-        author_display: displayName,
-        author_text_color: textColor,
-        author_avatar_url: avatarUrl
-      })
-      .eq("user_id", state.currentUser.id);
-
-    if (postsError) {
-      profileFeedbackEl.textContent = postsError.message;
-      return;
-    }
-
-    avatarFileInputEl.value = "";
-    profileFeedbackEl.textContent = "Perfil atualizado.";
-    await refreshData();
-  });
-
-  resetAvatarEl.addEventListener("click", async () => {
-    if (!supabaseClient || !state.currentUser) {
-      return;
-    }
-
-    const { error: profileError } = await supabaseClient
-      .from("profiles")
-      .update({ avatar_url: "" })
-      .eq("id", state.currentUser.id);
-
-    if (profileError) {
-      profileFeedbackEl.textContent = profileError.message;
-      return;
-    }
-
-    const { error: postsError } = await supabaseClient
-      .from("posts")
-      .update({ author_avatar_url: "" })
-      .eq("user_id", state.currentUser.id);
-
-    if (postsError) {
-      profileFeedbackEl.textContent = postsError.message;
-      return;
-    }
-
-    profileFeedbackEl.textContent = "Foto removida.";
-    await refreshData();
   });
 
   filterButtons.forEach((button) => {
@@ -336,111 +177,18 @@ function bindAppEvents() {
       renderPosts();
     });
   });
-
-  rainToggleEl.addEventListener("click", async () => {
-    if (!audioContext) {
-      setupRainAudio();
-    }
-    if (!audioContext || !rainNodes) {
-      return;
-    }
-    if (audioContext.state === "suspended") {
-      await audioContext.resume();
-    }
-    if (rainNodes.enabled) {
-      rainNodes.master.gain.linearRampToValueAtTime(0, audioContext.currentTime + 0.4);
-      rainNodes.enabled = false;
-      rainToggleEl.textContent = "Ativar chuva";
-      audioStatusEl.textContent = "Áudio desligado.";
-      return;
-    }
-    const volume = Number(rainVolumeEl.value) / 100;
-    rainNodes.master.gain.linearRampToValueAtTime(volume * 0.38, audioContext.currentTime + 0.4);
-    rainNodes.enabled = true;
-    rainToggleEl.textContent = "Pausar chuva";
-    audioStatusEl.textContent = "Chuva ambiente ativa.";
-  });
-
-  rainVolumeEl.addEventListener("input", () => {
-    if (!rainNodes || !audioContext) {
-      return;
-    }
-    const volume = Number(rainVolumeEl.value) / 100;
-    if (rainNodes.enabled) {
-      rainNodes.master.gain.linearRampToValueAtTime(volume * 0.38, audioContext.currentTime + 0.2);
-    }
-  });
 }
 
-async function applySession(session) {
-  state.currentUser = session?.user || null;
-
-  if (!state.currentUser) {
-    state.currentProfile = null;
-    state.posts = [];
-    state.votes = {};
-    syncAuthView();
-    return;
+async function initApp() {
+  try {
+    state.posts = await loadPosts();
+    feedbackEl.textContent = "Textos longos agora usam armazenamento ampliado no navegador.";
+  } catch (error) {
+    state.posts = [...defaultPosts];
+    feedbackEl.textContent = "Falha ao carregar o armazenamento local. Usando relatos de exemplo.";
+    console.error(error);
   }
 
-  await refreshData();
-  syncAuthView();
-}
-
-async function refreshData() {
-  if (!supabaseClient || !state.currentUser) {
-    return;
-  }
-
-  const [profileResult, postsResult, votesResult] = await Promise.all([
-    supabaseClient.from("profiles").select("*").eq("id", state.currentUser.id).single(),
-    supabaseClient.from("posts").select("*").order("created_at", { ascending: false }),
-    supabaseClient.from("post_votes").select("post_id, value").eq("user_id", state.currentUser.id)
-  ]);
-
-  if (profileResult.error) {
-    authFeedbackEl.textContent = profileResult.error.message;
-    return;
-  }
-
-  if (postsResult.error) {
-    feedbackEl.textContent = postsResult.error.message;
-    return;
-  }
-
-  if (votesResult.error) {
-    feedbackEl.textContent = votesResult.error.message;
-    return;
-  }
-
-  state.currentProfile = normalizeProfile(profileResult.data, state.currentUser.email || "");
-  state.posts = Array.isArray(postsResult.data) ? postsResult.data : [];
-  state.votes = Object.fromEntries((votesResult.data || []).map((vote) => [vote.post_id, vote.value]));
-  syncAuthView();
-}
-
-function syncAuthView() {
-  const loggedIn = Boolean(state.currentUser);
-  authGateEl.classList.toggle("is-hidden", loggedIn);
-  appShellEl.classList.toggle("is-locked", !loggedIn);
-  appShellEl.setAttribute("aria-hidden", String(!loggedIn));
-
-  if (!loggedIn || !state.currentProfile) {
-    feedbackEl.textContent = "";
-    return;
-  }
-
-  authorInputEl.value = state.currentProfile.display_name;
-  displayNameInputEl.value = state.currentProfile.display_name;
-  textColorInputEl.value = normalizeColor(state.currentProfile.text_color);
-  profilePreviewAvatarEl.src = state.currentProfile.avatar_url || DEFAULT_AVATAR;
-  sessionAvatarEl.src = state.currentProfile.avatar_url || DEFAULT_AVATAR;
-  sessionIndicatorEl.textContent = `Logado como u/${state.currentProfile.display_name}`;
-  sessionIndicatorEl.style.color = state.currentProfile.text_color;
-  profileNameEl.textContent = `u/${state.currentProfile.display_name}`;
-  profileNameEl.style.color = state.currentProfile.text_color;
-  profileEmailEl.textContent = state.currentUser.email || "";
-  profilePostCountEl.textContent = String(state.posts.filter((post) => post.user_id === state.currentUser.id).length);
   renderPosts();
 }
 
@@ -448,10 +196,13 @@ function renderGroupControls() {
   groupListEl.innerHTML = "";
   groupSelectEl.innerHTML = "";
 
-  GROUPS.forEach((group) => {
+  groups.forEach((group) => {
     const option = document.createElement("option");
     option.value = group.id;
     option.textContent = `c/${group.nome}`;
+    if (group.id === "terror-classico") {
+      option.selected = true;
+    }
     groupSelectEl.appendChild(option);
 
     if (group.id === "todos") {
@@ -463,11 +214,13 @@ function renderGroupControls() {
     button.className = "group-button";
     button.dataset.group = group.id;
     button.innerHTML = `<strong>c/${group.nome}</strong><small>${group.descricao}</small>`;
+
     button.addEventListener("click", () => {
       state.selectedGroup = group.id;
       syncActiveGroup();
       renderPosts();
     });
+
     groupListEl.appendChild(button);
   });
 
@@ -481,6 +234,7 @@ function renderGroupControls() {
     syncActiveGroup();
     renderPosts();
   });
+
   groupListEl.prepend(allButton);
 }
 
@@ -493,10 +247,11 @@ function syncActiveGroup() {
 
 function renderPosts() {
   const visiblePosts = getVisiblePosts();
-  const currentGroup = GROUPS.find((group) => group.id === state.selectedGroup);
+  const currentGroup = groups.find((group) => group.id === state.selectedGroup);
   feedTitleEl.textContent = state.selectedGroup === "todos" ? "Todos os relatos" : `c/${currentGroup?.nome || "Grupo"}`;
 
   postFeedEl.innerHTML = "";
+
   if (!visiblePosts.length) {
     const emptyState = document.createElement("article");
     emptyState.className = "empty-state";
@@ -510,28 +265,17 @@ function renderPosts() {
 
   visiblePosts.forEach((post) => {
     const node = postTemplate.content.firstElementChild.cloneNode(true);
-    const group = GROUPS.find((item) => item.id === post.group_id);
-    const voteState = state.votes[post.id] || 0;
+    const group = groups.find((item) => item.id === post.group);
 
-    node.querySelector(".vote-score").textContent = post.votes_count;
+    node.querySelector(".vote-score").textContent = post.votes;
     node.querySelector(".post-group").textContent = `c/${group?.nome || "Grupo"}`;
-    node.querySelector(".post-author").textContent = `por u/${post.author_display}`;
-    node.querySelector(".post-author").style.color = post.author_text_color || "#f5eef8";
-    node.querySelector(".post-date").textContent = formatDate(post.created_at);
-    node.querySelector(".post-owner").textContent = `ID do autor: ${post.author_username}`;
+    node.querySelector(".post-author").textContent = `por u/${post.author}`;
+    node.querySelector(".post-date").textContent = formatDate(post.createdAt);
     node.querySelector(".post-title").textContent = post.title;
     node.querySelector(".post-text").textContent = post.content;
-    node.querySelector(".post-avatar").src = post.author_avatar_url || DEFAULT_AVATAR;
-
-    const upButton = node.querySelector(".vote-button--up");
-    const downButton = node.querySelector(".vote-button--down");
-    upButton.classList.toggle("is-active", voteState === 1);
-    downButton.classList.toggle("is-active", voteState === -1);
-    upButton.addEventListener("click", () => handleVote(post.id, 1));
-    downButton.addEventListener("click", () => handleVote(post.id, -1));
 
     const tagsEl = node.querySelector(".post-tags");
-    (post.tags || []).forEach((tag) => {
+    post.tags.forEach((tag) => {
       const badge = document.createElement("span");
       badge.className = "tag";
       badge.textContent = `#${tag}`;
@@ -542,72 +286,147 @@ function renderPosts() {
   });
 }
 
-async function handleVote(postId, value) {
-  if (!supabaseClient || !state.currentUser) {
-    return;
-  }
-
-  const previous = state.votes[postId] || 0;
-  if (previous === value) {
-    const { error } = await supabaseClient
-      .from("post_votes")
-      .delete()
-      .eq("post_id", postId)
-      .eq("user_id", state.currentUser.id);
-    if (error) {
-      feedbackEl.textContent = error.message;
-      return;
-    }
-  } else {
-    const { error } = await supabaseClient
-      .from("post_votes")
-      .upsert({ post_id: postId, user_id: state.currentUser.id, value }, { onConflict: "post_id,user_id" });
-    if (error) {
-      feedbackEl.textContent = error.message;
-      return;
-    }
-  }
-
-  await refreshData();
-}
-
 function getVisiblePosts() {
   let posts = [...state.posts];
 
   if (state.selectedGroup !== "todos") {
-    posts = posts.filter((post) => post.group_id === state.selectedGroup);
+    posts = posts.filter((post) => post.group === state.selectedGroup);
   }
 
   if (state.filter === "recent") {
-    posts.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    posts.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   } else if (state.filter === "long") {
     posts.sort((a, b) => b.content.length - a.content.length);
-  } else if (state.filter === "mine") {
-    posts = posts.filter((post) => post.user_id === state.currentUser?.id);
-    posts.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
   }
 
   return posts;
 }
 
-function normalizeProfile(profile, email) {
-  return {
-    id: profile.id,
-    username: profile.username,
-    display_name: profile.display_name,
-    text_color: normalizeColor(profile.text_color),
-    avatar_url: profile.avatar_url || DEFAULT_AVATAR,
-    email
-  };
+async function loadPosts() {
+  const postsFromDb = await getPostsFromIndexedDb();
+  if (postsFromDb.length) {
+    return postsFromDb;
+  }
+
+  const legacyPosts = loadPostsFromLocalStorage();
+  if (legacyPosts.length) {
+    await savePostsToIndexedDb(legacyPosts);
+    return legacyPosts;
+  }
+
+  await savePosts(defaultPosts);
+  return [...defaultPosts];
 }
 
-function normalizeUsername(value) {
-  return String(value).trim().replace(/\s+/g, "_");
+async function savePosts(posts) {
+  await savePostsToIndexedDb(posts);
+
+  try {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(posts.slice(0, 20)));
+  } catch (error) {
+    console.warn("Resumo dos posts não coube no localStorage.", error);
+  }
 }
 
-function normalizeColor(value) {
-  const color = String(value || "").trim();
-  return /^#[0-9a-fA-F]{6}$/.test(color) ? color : "#f5eef8";
+function loadPostsFromLocalStorage() {
+  const saved = window.localStorage.getItem(STORAGE_KEY);
+  if (!saved) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(saved);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (error) {
+    console.warn("Falha ao ler posts legados do localStorage.", error);
+    return [];
+  }
+}
+
+function openDb() {
+  return new Promise((resolve, reject) => {
+    const request = window.indexedDB.open(DB_NAME, DB_VERSION);
+
+    request.addEventListener("upgradeneeded", () => {
+      const database = request.result;
+      if (!database.objectStoreNames.contains(POSTS_STORE)) {
+        database.createObjectStore(POSTS_STORE, { keyPath: "id" });
+      }
+    });
+
+    request.addEventListener("success", () => {
+      resolve(request.result);
+    });
+
+    request.addEventListener("error", () => {
+      reject(request.error || new Error("Falha ao abrir IndexedDB."));
+    });
+  });
+}
+
+async function getPostsFromIndexedDb() {
+  if (!("indexedDB" in window)) {
+    return [];
+  }
+
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(POSTS_STORE, "readonly");
+    const store = transaction.objectStore(POSTS_STORE);
+    const request = store.getAll();
+
+    request.addEventListener("success", () => {
+      const posts = Array.isArray(request.result) ? request.result : [];
+      posts.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      resolve(posts);
+    });
+
+    request.addEventListener("error", () => {
+      reject(request.error || new Error("Falha ao carregar posts do IndexedDB."));
+    });
+
+    transaction.addEventListener("complete", () => db.close());
+    transaction.addEventListener("error", () => db.close());
+    transaction.addEventListener("abort", () => db.close());
+  });
+}
+
+async function savePostsToIndexedDb(posts) {
+  if (!("indexedDB" in window)) {
+    throw new Error("IndexedDB indisponível neste navegador.");
+  }
+
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(POSTS_STORE, "readwrite");
+    const store = transaction.objectStore(POSTS_STORE);
+    const clearRequest = store.clear();
+
+    clearRequest.addEventListener("error", () => {
+      reject(clearRequest.error || new Error("Falha ao limpar posts no IndexedDB."));
+    });
+
+    clearRequest.addEventListener("success", () => {
+      posts.forEach((post) => {
+        store.put(post);
+      });
+    });
+
+    transaction.addEventListener("complete", () => {
+      db.close();
+      resolve();
+    });
+
+    transaction.addEventListener("error", () => {
+      db.close();
+      reject(transaction.error || new Error("Falha ao salvar posts no IndexedDB."));
+    });
+
+    transaction.addEventListener("abort", () => {
+      db.close();
+      reject(transaction.error || new Error("Gravação abortada no IndexedDB."));
+    });
+  });
 }
 
 function formatDate(dateString) {
@@ -617,64 +436,6 @@ function formatDate(dateString) {
   }).format(new Date(dateString));
 }
 
-function readFileAsDataUrl(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result));
-    reader.onerror = () => reject(new Error("Falha ao ler imagem."));
-    reader.readAsDataURL(file);
-  });
-}
-
-function setupRainAudio() {
-  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-  if (!AudioContextClass) {
-    audioStatusEl.textContent = "Seu navegador não suporta áudio ambiente gerado.";
-    rainToggleEl.disabled = true;
-    return;
-  }
-
-  audioContext = new AudioContextClass();
-  const noiseBuffer = audioContext.createBuffer(1, audioContext.sampleRate * 2, audioContext.sampleRate);
-  const data = noiseBuffer.getChannelData(0);
-  for (let index = 0; index < data.length; index += 1) {
-    data[index] = Math.random() * 2 - 1;
-  }
-
-  const noiseSource = audioContext.createBufferSource();
-  noiseSource.buffer = noiseBuffer;
-  noiseSource.loop = true;
-
-  const lowpass = audioContext.createBiquadFilter();
-  lowpass.type = "lowpass";
-  lowpass.frequency.value = 1800;
-
-  const highpass = audioContext.createBiquadFilter();
-  highpass.type = "highpass";
-  highpass.frequency.value = 320;
-
-  const rumble = audioContext.createBiquadFilter();
-  rumble.type = "lowpass";
-  rumble.frequency.value = 540;
-
-  const rumbleGain = audioContext.createGain();
-  rumbleGain.gain.value = 0.16;
-
-  const hissGain = audioContext.createGain();
-  hissGain.gain.value = 0.22;
-
-  const master = audioContext.createGain();
-  master.gain.value = 0;
-
-  noiseSource.connect(lowpass);
-  lowpass.connect(hissGain);
-  hissGain.connect(master);
-  noiseSource.connect(highpass);
-  highpass.connect(rumble);
-  rumble.connect(rumbleGain);
-  rumbleGain.connect(master);
-  master.connect(audioContext.destination);
-  noiseSource.start();
-
-  rainNodes = { master, enabled: false };
+function randomVoteCount() {
+  return Math.floor(Math.random() * 220) + 12;
 }
