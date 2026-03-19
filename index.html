@@ -21,8 +21,9 @@
       <p class="auth-panel__eyebrow">Acesso restrito</p>
       <h1 class="auth-panel__title">Acreta</h1>
       <p class="auth-panel__text">
-        Cadastre-se para entrar no fórum e guardar seus contos no próprio perfil.
+        Cadastre-se para entrar no fórum e guardar seus contos em um perfil real do Supabase.
       </p>
+      <p id="setup-warning" class="setup-warning is-hidden"></p>
 
       <div class="auth-switch">
         <button id="show-login" class="filter-chip is-active" type="button">Entrar</button>
@@ -31,28 +32,32 @@
 
       <form id="login-form" class="auth-form">
         <label>
-          <span>Usuário</span>
-          <input name="username" type="text" maxlength="24" placeholder="Seu nome de acesso" required>
+          <span>E-mail</span>
+          <input name="email" type="email" maxlength="120" placeholder="voce@email.com" required>
         </label>
         <label>
           <span>Senha</span>
-          <input name="password" type="password" maxlength="40" placeholder="Sua senha" required>
+          <input name="password" type="password" maxlength="80" placeholder="Sua senha" required>
         </label>
         <button class="button button--primary" type="submit">Entrar no Acreta</button>
       </form>
 
       <form id="register-form" class="auth-form is-hidden">
         <label>
-          <span>Usuário</span>
-          <input name="username" type="text" maxlength="24" placeholder="Crie seu nome de acesso" required>
+          <span>ID visível</span>
+          <input name="username" type="text" maxlength="24" placeholder="Como seu perfil vai aparecer" required>
+        </label>
+        <label>
+          <span>E-mail</span>
+          <input name="email" type="email" maxlength="120" placeholder="voce@email.com" required>
         </label>
         <label>
           <span>Senha</span>
-          <input name="password" type="password" maxlength="40" placeholder="Crie sua senha" required>
+          <input name="password" type="password" maxlength="80" placeholder="Crie sua senha" required>
         </label>
         <label>
           <span>Confirmar senha</span>
-          <input name="confirmPassword" type="password" maxlength="40" placeholder="Repita sua senha" required>
+          <input name="confirmPassword" type="password" maxlength="80" placeholder="Repita sua senha" required>
         </label>
         <button class="button button--primary" type="submit">Criar conta</button>
       </form>
@@ -86,8 +91,8 @@
           <p class="hero__tag">Contos obscuros, ruído de chuva e fundo vivo</p>
           <h2>Publique terror, ficção sombria e paranoia psicológica em grupos próprios.</h2>
           <p class="hero__text">
-            O Acreta organiza histórias por subgênero, mantém o clima pesado em toda a interface
-            e oferece um espaço local para testar postagens, filtros e leitura imersiva.
+            O Acreta agora pode usar autenticação e dados reais no Supabase, mantendo o clima pesado,
+            o feed compartilhado e o perfil persistido entre usuários.
           </p>
           <div class="hero__stats">
             <article>
@@ -95,12 +100,12 @@
               <span>grupos de exemplo</span>
             </article>
             <article>
-              <strong>Chuva</strong>
-              <span>ambiente opcional</span>
+              <strong>Online</strong>
+              <span>postagens compartilhadas</span>
             </article>
             <article>
               <strong>Perfil</strong>
-              <span>contos ligados ao autor</span>
+              <span>ligado ao autor</span>
             </article>
           </div>
         </div>
@@ -143,7 +148,7 @@
               <img id="profile-preview-avatar" class="profile-preview-avatar" alt="Foto do perfil">
               <div>
                 <p id="profile-name" class="profile-box__name"></p>
-                <p class="profile-box__text">Seus contos publicados ficam salvos no seu perfil neste navegador.</p>
+                <p id="profile-email" class="profile-box__text"></p>
               </div>
             </div>
             <div class="profile-box__stats">
@@ -294,6 +299,8 @@
     </article>
   </template>
 
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase-config.js"></script>
   <script src="script.js"></script>
 </body>
 </html>
