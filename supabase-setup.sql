@@ -16,6 +16,9 @@ create table if not exists public.posts (
   group_id text not null,
   title text not null,
   content text not null,
+  post_type text not null default 'text',
+  media_image_url text not null default '',
+  media_video_url text not null default '',
   tags text[] not null default '{}',
   author_display text not null,
   author_username text not null,
@@ -24,6 +27,10 @@ create table if not exists public.posts (
   votes_count integer not null default 0,
   created_at timestamptz not null default now()
 );
+
+alter table public.posts add column if not exists post_type text not null default 'text';
+alter table public.posts add column if not exists media_image_url text not null default '';
+alter table public.posts add column if not exists media_video_url text not null default '';
 
 create table if not exists public.post_votes (
   post_id uuid not null references public.posts(id) on delete cascade,
@@ -172,6 +179,9 @@ insert into public.posts (
   group_id,
   title,
   content,
+  post_type,
+  media_image_url,
+  media_video_url,
   tags,
   author_display,
   author_username,
@@ -186,6 +196,9 @@ from (
       'creepypasta',
       'Borrasca',
       'Uma indicação essencial para quem gosta de creepypasta longa e sufocante. Borrasca gira em torno de uma cidade cheia de segredos, desaparecimentos e uma sensação constante de que toda lembrança de infância esconde algo podre. Este post funciona como destaque e sinopse curta do conto, não como reprodução integral.',
+      'text',
+      '',
+      '',
       array['creepypasta', 'mistério', 'cidade pequena'],
       'ArquivoNeblina',
       'ArquivoNeblina',
@@ -197,6 +210,9 @@ from (
       'horror-psicologico',
       'Meu reflexo piscou antes de mim',
       'Fiquei sem energia por três horas. Quando acendi a lanterna do celular no banheiro, o espelho já mostrava meu rosto. O problema é que eu ainda estava no corredor.',
+      'text',
+      '',
+      '',
       array['espelho', 'apartamento', 'paranoia'],
       'NoiteFixa',
       'NoiteFixa',
@@ -208,6 +224,9 @@ from (
       'ficcao-sombria',
       'O elevador do laboratório desceu para um andar negativo que não existia',
       'O painel marcava -9. Nenhum de nós apertou esse botão. Quando a porta abriu, vimos uma ala inteira com nossas mesas, nossas fotos e os nossos corpos sentados, como se nunca tivéssemos saído dali.',
+      'text',
+      '',
+      '',
       array['laboratório', 'sci-fi', 'duplicatas'],
       'DrVeludo',
       'DrVeludo',
@@ -219,6 +238,9 @@ from (
   group_id,
   title,
   content,
+  post_type,
+  media_image_url,
+  media_video_url,
   tags,
   author_display,
   author_username,

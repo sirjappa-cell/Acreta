@@ -69,7 +69,7 @@
   </div>
 
   <div id="app-shell" class="page-shell is-locked" aria-hidden="true">
-    <header class="hero">
+    <header class="hero hero--compact">
       <div class="hero__veil"></div>
       <nav class="topbar">
         <div class="brand">
@@ -79,6 +79,11 @@
             <h1 class="brand__title">Acreta</h1>
           </div>
         </div>
+        <div class="hero__status">
+          <p class="hero__tag glitch-text" data-text="Leitura por sua conta">Leitura por sua conta</p>
+          <h2>Você não deveria ter encontrado isto.</h2>
+          <p class="hero__text">Os relatórios continuam surgindo. Leia pouco e saia cedo.</p>
+        </div>
         <div class="topbar__controls">
           <div class="session-user">
             <img id="session-avatar" class="session-avatar" alt="Foto do perfil">
@@ -87,75 +92,15 @@
           <button id="logout-button" class="topbar__action" type="button">Sair</button>
         </div>
       </nav>
-
-      <section class="hero__content">
-        <div class="hero__copy">
-          <p class="hero__tag glitch-text" data-text="Leitura por sua conta">Leitura por sua conta</p>
-          <h2>Alguns relatos nunca deveriam ter sido escritos.</h2>
-          <p class="hero__text">
-            O Acreta registra ecos, confissões e fragmentos deixados por quem afirma ter visto algo errado.
-            Entre, leia pouco e saia cedo.
-          </p>
-          <div class="hero__stats">
-            <article>
-              <strong>10</strong>
-              <span>círculos abertos</span>
-            </article>
-            <article>
-              <strong id="unknown-users-count">7</strong>
-              <span>presenças sem identificação</span>
-            </article>
-            <article>
-              <strong id="new-reports-count">0</strong>
-              <span>novos registros desde sua última visita</span>
-            </article>
-          </div>
-          <div class="hero__signals">
-            <p id="last-activity" class="signal-pill">Última atividade detectada: aguardando leitura...</p>
-            <p id="system-whisper" class="signal-pill">Os relatórios estão começando a aparecer.</p>
-          </div>
-        </div>
-
-        <aside class="hero__panel">
-          <p class="panel__label">Relato em destaque</p>
-          <article class="featured-report">
-            <p class="featured-report__eyebrow">Registro recente // círculo da chuva</p>
-            <h3>“Ainda ouço a chuva quando tudo já ficou em silêncio.”</h3>
-            <p>
-              O corredor secou às 03:14, mas as pegadas continuaram surgindo na madeira. Nenhuma ia para
-              fora do quarto. Todas vinham em minha direção.
-            </p>
-          </article>
-          <ul class="spotlight-list">
-            <li>Círculos separados para não contaminar arquivos com atmosferas incompatíveis.</li>
-            <li>Registros recentes sobem primeiro, mas os mais longos parecem permanecer.</li>
-            <li>Certos nomes continuam aparecendo mesmo quando ninguém assume ter escrito.</li>
-          </ul>
-
-          <div class="audio-panel">
-            <div>
-              <p class="audio-panel__title">Escuta de fundo</p>
-              <p class="audio-panel__text">Mantenha a chuva baixa. Os ruídos distantes costumam vir depois.</p>
-            </div>
-            <div class="audio-panel__controls">
-              <button id="rain-toggle" class="button button--secondary" type="button">Iniciar escuta</button>
-              <label class="audio-toggle" for="auto-rain">
-                <input id="auto-rain" type="checkbox">
-                <span>Iniciar automaticamente em volume baixo</span>
-              </label>
-              <label class="volume-wrap" for="rain-volume">
-                <span>Volume</span>
-                <input id="rain-volume" type="range" min="0" max="100" value="18">
-              </label>
-            </div>
-            <p id="audio-status" class="audio-panel__status" aria-live="polite">Escuta inativa.</p>
-          </div>
-        </aside>
-      </section>
+      <div class="hero__signals hero__signals--compact">
+        <p id="last-activity" class="signal-pill">Última atividade detectada: aguardando leitura...</p>
+        <p id="system-whisper" class="signal-pill">Os relatórios estão começando a aparecer.</p>
+        <p class="signal-pill"><strong id="new-reports-count">0</strong> novos relatos desde sua última visita.</p>
+      </div>
     </header>
 
-    <main class="layout">
-      <aside class="sidebar">
+    <main class="layout layout--reddit">
+      <aside class="sidebar sidebar--left">
         <section class="card card--profile">
           <div class="card__header">
             <h3>Identidade</h3>
@@ -172,9 +117,194 @@
             <div class="profile-box__stats">
               <article>
                 <strong id="profile-post-count">0</strong>
-                <span>registros</span>
+                <span>relatos</span>
               </article>
             </div>
+          </div>
+        </section>
+
+        <section class="card card--nav">
+          <div class="card__header">
+            <h3>Navegação</h3>
+            <span>arquivo vivo</span>
+          </div>
+          <div class="nav-list">
+            <button class="nav-button is-active" type="button" data-nav="circles">Círculos / Arquivos</button>
+            <button class="nav-button" type="button" data-nav="all">Todos os relatos</button>
+            <button class="nav-button" type="button" data-nav="recent">Recentes</button>
+            <button class="nav-button" type="button" data-nav="mine">Meus relatos</button>
+            <button class="nav-button" type="button" data-nav="saved">Salvos</button>
+            <button class="nav-button" type="button" data-nav="trending">Tendências</button>
+            <button class="nav-button" type="button" data-nav="identity">Identidade / Perfil</button>
+          </div>
+        </section>
+
+        <section class="card card--groups">
+          <div class="card__header">
+            <h3>Círculos</h3>
+            <span>10 arquivos abertos</span>
+          </div>
+          <div id="group-list" class="group-list"></div>
+        </section>
+      </aside>
+
+      <section class="content content--center">
+        <section class="card composer composer--compact">
+          <div class="composer__shell">
+            <button id="composer-toggle" class="composer__prompt" type="button">Registrar ocorrência...</button>
+            <div class="composer__modes">
+              <button class="mode-chip is-active" type="button" data-post-type="text">Texto</button>
+              <button class="mode-chip" type="button" data-post-type="image">Imagem</button>
+              <button class="mode-chip" type="button" data-post-type="video">Vídeo</button>
+              <button class="mode-chip" type="button" data-post-type="mixed">Misto</button>
+            </div>
+          </div>
+
+          <form id="post-form" class="composer__form is-collapsed">
+            <input id="post-type" name="postType" type="hidden" value="text">
+            <label>
+              <span>Título</span>
+              <input id="title" name="title" type="text" maxlength="90" placeholder="Ex.: As luzes do 4º andar estavam acesas por dentro da parede" required>
+            </label>
+
+            <div class="composer__row">
+              <label>
+                <span>Círculo</span>
+                <select id="group" name="group" required></select>
+              </label>
+
+              <label>
+                <span>Relato</span>
+                <input id="author" name="author" type="text" maxlength="28" required readonly>
+              </label>
+            </div>
+
+            <label>
+              <span>Tags</span>
+              <input id="tags" name="tags" type="text" maxlength="80" placeholder="Ex.: chuva, corredor, rádio, vulto">
+            </label>
+
+            <label class="composer__text-field">
+              <span>Relato</span>
+              <textarea id="content" name="content" rows="12" placeholder="Registre o que viu antes que isso desapareça..."></textarea>
+            </label>
+
+            <div class="composer__media-grid">
+              <label class="media-field media-field--image">
+                <span>Anexar imagem</span>
+                <input id="image-upload" name="imageUpload" type="file" accept="image/png,image/jpeg,image/webp,image/gif">
+              </label>
+              <label class="media-field media-field--video">
+                <span>Anexar vídeo</span>
+                <input id="video-upload" name="videoUpload" type="file" accept="video/mp4,video/webm,video/ogg">
+              </label>
+            </div>
+
+            <section id="media-preview" class="media-preview is-hidden">
+              <div class="card__header">
+                <h3>Pré-visualização</h3>
+                <span>antes de arquivar</span>
+              </div>
+              <div class="media-preview__body">
+                <img id="image-preview" class="media-preview__image is-hidden" alt="Pré-visualização da imagem">
+                <video id="video-preview" class="media-preview__video is-hidden" controls preload="metadata"></video>
+              </div>
+            </section>
+
+            <div class="composer__actions">
+              <p id="form-feedback" class="composer__feedback" aria-live="polite"></p>
+              <div class="composer__actions-right">
+                <button id="composer-cancel" class="button button--secondary" type="button">Recolher</button>
+                <button class="button button--primary" type="submit">Arquivar registro</button>
+              </div>
+            </div>
+          </form>
+        </section>
+
+        <section class="feed-header">
+          <div>
+            <p class="feed-header__eyebrow">Arquivo principal</p>
+            <h3 id="feed-title">Todos os registros</h3>
+          </div>
+
+          <div class="feed-filter">
+            <button class="filter-chip is-active" type="button" data-filter="all">Arquivo completo</button>
+            <button class="filter-chip" type="button" data-filter="recent">Sinais recentes</button>
+            <button class="filter-chip" type="button" data-filter="long">Registros longos</button>
+            <button class="filter-chip" type="button" data-filter="mine">Meu rastro</button>
+            <button class="filter-chip" type="button" data-filter="saved">Salvos</button>
+            <button class="filter-chip" type="button" data-filter="trending">Tendências</button>
+          </div>
+        </section>
+
+        <section id="post-feed" class="post-feed"></section>
+      </section>
+
+      <aside class="sidebar sidebar--right">
+        <section class="card card--featured">
+          <div class="card__header">
+            <h3>Relato em destaque</h3>
+            <span>arquivo recente</span>
+          </div>
+          <article class="featured-report">
+            <p class="featured-report__eyebrow">Registro recente // círculo da chuva</p>
+            <h3>“Ainda ouço a chuva quando tudo já ficou em silêncio.”</h3>
+            <p>
+              O corredor secou às 03:14, mas as pegadas continuaram surgindo na madeira. Nenhuma ia para fora do quarto.
+              Todas vinham em minha direção.
+            </p>
+          </article>
+        </section>
+
+        <section class="card card--activity">
+          <div class="card__header">
+            <h3>Atividade detectada</h3>
+            <span>varredura parcial</span>
+          </div>
+          <div class="signal-stack">
+            <p class="signal-pill"><strong id="unknown-users-count">7</strong> presenças sem identificação.</p>
+            <p id="right-last-activity" class="signal-pill">Última atividade detectada: aguardando leitura...</p>
+          </div>
+        </section>
+
+        <section class="card card--recommended">
+          <div class="card__header">
+            <h3>Círculos recomendados</h3>
+            <span>combinações prováveis</span>
+          </div>
+          <div id="recommended-groups" class="recommended-list"></div>
+        </section>
+
+        <section class="card card--rules">
+          <div class="card__header">
+            <h3>Aviso do círculo</h3>
+            <span>regras ativas</span>
+          </div>
+          <div id="circle-rules" class="rules-box"></div>
+        </section>
+
+        <section class="card card--audio">
+          <div class="card__header">
+            <h3>Escuta de fundo</h3>
+            <span>canal atmosférico</span>
+          </div>
+          <div class="audio-panel">
+            <div>
+              <p class="audio-panel__title">Chuva baixa e ruídos distantes</p>
+              <p class="audio-panel__text">Mantenha a chuva baixa. Os sons mais longes costumam vir depois.</p>
+            </div>
+            <div class="audio-panel__controls">
+              <button id="rain-toggle" class="button button--secondary" type="button">Iniciar escuta</button>
+              <label class="audio-toggle" for="auto-rain">
+                <input id="auto-rain" type="checkbox">
+                <span>Iniciar automaticamente em volume baixo</span>
+              </label>
+              <label class="volume-wrap" for="rain-volume">
+                <span>Volume</span>
+                <input id="rain-volume" type="range" min="0" max="100" value="18">
+              </label>
+            </div>
+            <p id="audio-status" class="audio-panel__status" aria-live="polite">Escuta inativa.</p>
           </div>
         </section>
 
@@ -203,85 +333,7 @@
             <p id="profile-feedback" class="composer__feedback" aria-live="polite"></p>
           </form>
         </section>
-
-        <section class="card card--groups">
-          <div class="card__header">
-            <h3>Círculos</h3>
-            <span>10 arquivos abertos</span>
-          </div>
-          <div id="group-list" class="group-list"></div>
-        </section>
-
-        <section class="card card--about">
-          <div class="card__header">
-            <h3>Protocolo</h3>
-          </div>
-          <ul class="about-list">
-            <li>O Acreta não opera como vitrine; ele arquiva registros e fragmentos.</li>
-            <li>Somente presenças cadastradas podem entrar, ler e anexar novos relatórios.</li>
-            <li>Cada entrada permanece ligada ao rastro do autor que a deixou.</li>
-          </ul>
-        </section>
       </aside>
-
-      <section class="content">
-        <section class="card composer">
-          <div class="card__header">
-            <h3>Anexar novo registro</h3>
-            <span>inserção controlada</span>
-          </div>
-
-          <form id="post-form" class="composer__form">
-            <label>
-              <span>Título</span>
-              <input id="title" name="title" type="text" maxlength="90" placeholder="Ex.: A porta do apartamento 404 nunca existiu" required>
-            </label>
-
-            <div class="composer__row">
-              <label>
-                <span>Círculo</span>
-                <select id="group" name="group" required></select>
-              </label>
-
-              <label>
-                <span>Autor</span>
-                <input id="author" name="author" type="text" maxlength="28" required readonly>
-              </label>
-            </div>
-
-            <label>
-              <span>Tags</span>
-              <input id="tags" name="tags" type="text" maxlength="80" placeholder="Ex.: floresta, ritual, criatura, fitas VHS">
-            </label>
-
-            <label>
-              <span>Texto</span>
-              <textarea id="content" name="content" rows="18" placeholder="Registre o que viu antes que isso desapareça..." required></textarea>
-            </label>
-
-            <div class="composer__actions">
-              <p id="form-feedback" class="composer__feedback" aria-live="polite"></p>
-              <button class="button button--primary" type="submit">Arquivar registro</button>
-            </div>
-          </form>
-        </section>
-
-        <section class="feed-header">
-          <div>
-            <p class="feed-header__eyebrow">Arquivo principal</p>
-            <h3 id="feed-title">Todos os registros</h3>
-          </div>
-
-          <div class="feed-filter">
-            <button class="filter-chip is-active" type="button" data-filter="all">Arquivo completo</button>
-            <button class="filter-chip" type="button" data-filter="recent">Sinais recentes</button>
-            <button class="filter-chip" type="button" data-filter="long">Registros longos</button>
-            <button class="filter-chip" type="button" data-filter="mine">Meu rastro</button>
-          </div>
-        </section>
-
-        <section id="post-feed" class="post-feed"></section>
-      </section>
     </main>
 
     <footer class="site-footer">
@@ -311,8 +363,14 @@
         </div>
 
         <h4 class="post-title"></h4>
+        <div class="post-media"></div>
         <p class="post-text"></p>
         <div class="post-tags"></div>
+        <div class="post-actions">
+          <button class="post-action post-action--comment" type="button">Comentar</button>
+          <button class="post-action post-action--save" type="button">Salvar</button>
+          <button class="post-action post-action--share" type="button">Compartilhar</button>
+        </div>
       </div>
     </article>
   </template>

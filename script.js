@@ -34,7 +34,8 @@ const state = {
   posts: [],
   currentUser: null,
   currentProfile: null,
-  votes: {}
+  votes: {},
+  savedPosts: new Set()
 };
 
 const supabaseUrl = window.ACRETA_SUPABASE_URL || "";
@@ -67,6 +68,17 @@ const formEl = document.querySelector("#post-form");
 const authorInputEl = document.querySelector("#author");
 const feedbackEl = document.querySelector("#form-feedback");
 const filterButtons = Array.from(document.querySelectorAll(".filter-chip"));
+const navButtons = Array.from(document.querySelectorAll(".nav-button"));
+const modeChips = Array.from(document.querySelectorAll(".mode-chip"));
+const composerToggleEl = document.querySelector("#composer-toggle");
+const composerCancelEl = document.querySelector("#composer-cancel");
+const postTypeInputEl = document.querySelector("#post-type");
+const contentInputEl = document.querySelector("#content");
+const imageUploadEl = document.querySelector("#image-upload");
+const videoUploadEl = document.querySelector("#video-upload");
+const mediaPreviewEl = document.querySelector("#media-preview");
+const imagePreviewEl = document.querySelector("#image-preview");
+const videoPreviewEl = document.querySelector("#video-preview");
 const profileNameEl = document.querySelector("#profile-name");
 const profileEmailEl = document.querySelector("#profile-email");
 const profilePostCountEl = document.querySelector("#profile-post-count");
@@ -87,7 +99,10 @@ const autoRainEl = document.querySelector("#auto-rain");
 const unknownUsersCountEl = document.querySelector("#unknown-users-count");
 const newReportsCountEl = document.querySelector("#new-reports-count");
 const lastActivityEl = document.querySelector("#last-activity");
+const rightLastActivityEl = document.querySelector("#right-last-activity");
 const systemWhisperEl = document.querySelector("#system-whisper");
+const recommendedGroupsEl = document.querySelector("#recommended-groups");
+const circleRulesEl = document.querySelector("#circle-rules");
 
 let audioContext = null;
 let rainNodes = null;
@@ -95,16 +110,64 @@ let thunderTimer = null;
 
 const LAST_VISIT_KEY = "acreta-last-visit";
 const AUTO_RAIN_KEY = "acreta-auto-rain";
+const SAVED_POSTS_KEY = "acreta-saved-posts";
 const SYSTEM_WHISPERS = [
   "Os relatórios estão começando a aparecer.",
   "Três arquivos foram movidos sem registro de acesso.",
   "Há nomes retornando aos círculos errados.",
   "A atividade aumenta quando a chuva quase some."
 ];
+const CIRCLE_RULES = {
+  todos: [
+    "Leia como se alguém estivesse editando o arquivo enquanto você observa.",
+    "Não mova um relato para outro círculo sem rever as tags."
+  ],
+  "terror-classico": [
+    "Registros devem preservar atmosfera, presença e ruína lenta.",
+    "Evite tecnologia central demais; deixe a casa respirar antes da entidade aparecer."
+  ],
+  "ficcao-sombria": [
+    "Toda máquina deve sugerir intenção própria.",
+    "Relatórios devem manter o desconforto técnico acima do espetáculo."
+  ],
+  "horror-psicologico": [
+    "A dúvida deve sobreviver até a última linha.",
+    "Sintomas, lapsos e contradições contam como evidência."
+  ],
+  "folk-horror": [
+    "O lugar precisa parecer mais antigo do que a memória do narrador.",
+    "Ritual sem consequência não entra no arquivo."
+  ],
+  investigacao: [
+    "Fragmentos, áudios e rastros parciais são bem-vindos.",
+    "Não feche o caso cedo demais."
+  ],
+  "sobrenatural-urbano": [
+    "Cidade viva, concreta e ligeiramente hostil.",
+    "Sinais banais podem ser mais perigosos do que aparições."
+  ],
+  creepypasta: [
+    "Entrada direta, rápida e com imagem mental forte.",
+    "O estranho deve começar cedo."
+  ],
+  cosmico: [
+    "Escala acima da compreensão humana.",
+    "O horror deve diminuir o narrador, não inflar o mundo."
+  ],
+  corpo: [
+    "Transformação física precisa custar algo.",
+    "Descreva o desconforto sem perder clareza."
+  ],
+  "pesadelos-reais": [
+    "Plausibilidade primeiro, explicação depois.",
+    "O comum deve ser o primeiro a falhar."
+  ]
+};
 
 renderGroupControls();
 bindAuthEvents();
 bindAppEvents();
+collapseComposer();
 boot();
 
 async function boot() {
@@ -228,6 +291,55 @@ function bindAuthEvents() {
 }
 
 function bindAppEvents() {
+  composerToggleEl.addEventListener("click", () => {
+    withDelay(composerToggleEl, () => {
+      formEl.classList.remove("is-collapsed");
+      contentInputEl.focus();
+    });
+  });
+
+  composerCancelEl.addEventListener("click", () => {
+    withDelay(composerCancelEl, () => collapseComposer());
+  });
+
+  modeChips.forEach((chip) => {
+    chip.addEventListener("click", () => {
+      withDelay(chip, () => setPostType(chip.dataset.postType || "text"));
+    });
+  });
+
+  navButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      withDelay(button, () => applyNav(button.dataset.nav || "all"));
+    });
+  });
+
+  imageUploadEl.addEventListener("change", async () => {
+    videoUploadEl.value = "";
+    const validation = validateMediaFile(imageUploadEl.files?.[0], "image");
+    if (validation) {
+      feedbackEl.textContent = validation;
+      imageUploadEl.value = "";
+      updateMediaPreview();
+      return;
+    }
+    feedbackEl.textContent = "";
+    await updateMediaPreview();
+  });
+
+  videoUploadEl.addEventListener("change", async () => {
+    imageUploadEl.value = "";
+    const validation = validateMediaFile(videoUploadEl.files?.[0], "video");
+    if (validation) {
+      feedbackEl.textContent = validation;
+      videoUploadEl.value = "";
+      updateMediaPreview();
+      return;
+    }
+    feedbackEl.textContent = "";
+    await updateMediaPreview();
+  });
+
   formEl.addEventListener("submit", async (event) => {
     event.preventDefault();
     if (!supabaseClient || !state.currentUser || !state.currentProfile) {
@@ -238,6 +350,7 @@ function bindAppEvents() {
     const title = String(formData.get("title")).trim();
     const groupId = String(formData.get("group")).trim();
     const content = String(formData.get("content")).trim();
+    const postType = String(formData.get("postType")).trim() || "text";
     const tags = String(formData.get("tags"))
       .trim()
       .split(",")
@@ -245,11 +358,25 @@ function bindAppEvents() {
       .filter(Boolean)
       .slice(0, 6);
 
+    const imageFile = imageUploadEl.files?.[0] || null;
+    const videoFile = videoUploadEl.files?.[0] || null;
+    const validationMessage = validateComposer(title, content, postType, imageFile, videoFile);
+    if (validationMessage) {
+      feedbackEl.textContent = validationMessage;
+      return;
+    }
+
+    const imageUrl = imageFile ? await readFileAsDataUrl(imageFile) : "";
+    const videoUrl = videoFile ? await readFileAsDataUrl(videoFile) : "";
+
     const payload = {
       user_id: state.currentUser.id,
       group_id: groupId,
       title,
       content,
+      post_type: normalizePostType(postType, imageUrl, videoUrl),
+      media_image_url: imageUrl,
+      media_video_url: videoUrl,
       tags,
       author_display: state.currentProfile.display_name,
       author_username: state.currentProfile.username,
@@ -259,11 +386,16 @@ function bindAppEvents() {
 
     const { error } = await supabaseClient.from("posts").insert(payload);
     if (error) {
-      feedbackEl.textContent = error.message;
+      if (error.message.includes("post_type") || error.message.includes("media_image_url") || error.message.includes("media_video_url")) {
+        feedbackEl.textContent = "O banco ainda não recebeu os campos de mídia. Rode o SQL atualizado no Supabase antes de publicar imagens e vídeos.";
+      } else {
+        feedbackEl.textContent = error.message;
+      }
       return;
     }
 
     formEl.reset();
+    collapseComposer();
     authorInputEl.value = state.currentProfile.display_name;
     feedbackEl.textContent = "Registro anexado ao arquivo.";
     state.selectedGroup = groupId;
@@ -356,6 +488,7 @@ function bindAppEvents() {
         state.filter = button.dataset.filter || "all";
         filterButtons.forEach((item) => item.classList.remove("is-active"));
         button.classList.add("is-active");
+        syncActiveNav(state.filter === "all" ? "all" : state.filter);
         renderPosts();
       });
     });
@@ -464,6 +597,8 @@ function syncAuthView() {
   profilePostCountEl.textContent = String(state.posts.filter((post) => post.user_id === state.currentUser.id).length);
   updateAtmosphericSignals();
   maybeAutostartRain();
+  renderRecommendedGroups();
+  renderCircleRules();
   renderPosts();
 }
 
@@ -489,7 +624,10 @@ function renderGroupControls() {
     button.addEventListener("click", () => {
       withDelay(button, () => {
         state.selectedGroup = group.id;
+        state.filter = "all";
+        filterButtons.forEach((item) => item.classList.toggle("is-active", item.dataset.filter === "all"));
         syncActiveGroup();
+        syncActiveNav("circles");
         renderPosts();
       });
     });
@@ -504,7 +642,10 @@ function renderGroupControls() {
   allButton.addEventListener("click", () => {
     withDelay(allButton, () => {
       state.selectedGroup = "todos";
+      state.filter = "all";
+      filterButtons.forEach((item) => item.classList.toggle("is-active", item.dataset.filter === "all"));
       syncActiveGroup();
+      syncActiveNav("circles");
       renderPosts();
     });
   });
@@ -516,12 +657,41 @@ function syncActiveGroup() {
   buttons.forEach((button) => {
     button.classList.toggle("is-active", button.dataset.group === state.selectedGroup);
   });
+  renderRecommendedGroups();
+  renderCircleRules();
+}
+
+function syncActiveNav(activeNav) {
+  navButtons.forEach((button) => {
+    button.classList.toggle("is-active", button.dataset.nav === activeNav);
+  });
+}
+
+function applyNav(nav) {
+  if (nav === "circles") {
+    syncActiveNav(nav);
+    document.querySelector(".card--groups")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    return;
+  }
+
+  if (nav === "identity") {
+    syncActiveNav(nav);
+    document.querySelector(".card--profile-edit")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    return;
+  }
+
+  state.filter = nav === "all" ? "all" : nav;
+  state.selectedGroup = "todos";
+  filterButtons.forEach((item) => item.classList.toggle("is-active", item.dataset.filter === state.filter));
+  syncActiveGroup();
+  syncActiveNav(nav);
+  renderPosts();
 }
 
 function renderPosts() {
   const visiblePosts = getVisiblePosts();
   const currentGroup = GROUPS.find((group) => group.id === state.selectedGroup);
-  feedTitleEl.textContent = state.selectedGroup === "todos" ? "Todos os registros" : `c/${currentGroup?.nome || "Círculo"}`;
+  feedTitleEl.textContent = getFeedTitle(currentGroup);
 
   postFeedEl.innerHTML = "";
   if (!visiblePosts.length) {
@@ -537,6 +707,7 @@ function renderPosts() {
 
   visiblePosts.forEach((post) => {
     const node = postTemplate.content.firstElementChild.cloneNode(true);
+    node.id = `post-${post.id}`;
     const group = GROUPS.find((item) => item.id === post.group_id);
     const voteState = state.votes[post.id] || 0;
 
@@ -547,8 +718,11 @@ function renderPosts() {
     node.querySelector(".post-date").textContent = formatDate(post.created_at);
     node.querySelector(".post-owner").textContent = `rastro do autor: ${post.author_username}`;
     node.querySelector(".post-title").textContent = post.title;
-    node.querySelector(".post-text").textContent = post.content;
+    const postTextEl = node.querySelector(".post-text");
+    postTextEl.textContent = post.content || "";
+    postTextEl.classList.toggle("is-empty", !post.content);
     node.querySelector(".post-avatar").src = post.author_avatar_url || DEFAULT_AVATAR;
+    renderPostMedia(node.querySelector(".post-media"), post);
 
     const upButton = node.querySelector(".vote-button--up");
     const downButton = node.querySelector(".vote-button--down");
@@ -564,6 +738,8 @@ function renderPosts() {
       badge.textContent = `#${tag}`;
       tagsEl.appendChild(badge);
     });
+
+    bindPostActions(node, post);
 
     postFeedEl.appendChild(node);
   });
@@ -612,9 +788,98 @@ function getVisiblePosts() {
   } else if (state.filter === "mine") {
     posts = posts.filter((post) => post.user_id === state.currentUser?.id);
     posts.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  } else if (state.filter === "saved") {
+    posts = posts.filter((post) => state.savedPosts.has(post.id));
+    posts.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  } else if (state.filter === "trending") {
+    posts.sort((a, b) => (b.votes_count || 0) - (a.votes_count || 0));
   }
 
   return posts;
+}
+
+function getFeedTitle(currentGroup) {
+  if (state.selectedGroup !== "todos") {
+    return `c/${currentGroup?.nome || "Círculo"}`;
+  }
+  if (state.filter === "saved") {
+    return "Relatos salvos";
+  }
+  if (state.filter === "trending") {
+    return "Registros em tendência";
+  }
+  if (state.filter === "mine") {
+    return "Meu rastro";
+  }
+  if (state.filter === "recent") {
+    return "Sinais recentes";
+  }
+  if (state.filter === "long") {
+    return "Registros longos";
+  }
+  return "Todos os registros";
+}
+
+function renderPostMedia(container, post) {
+  container.innerHTML = "";
+  const imageUrl = post.media_image_url || "";
+  const videoUrl = post.media_video_url || "";
+  container.classList.toggle("is-empty", !imageUrl && !videoUrl);
+
+  if (imageUrl) {
+    const image = document.createElement("img");
+    image.src = imageUrl;
+    image.alt = `Anexo visual do relato ${post.title}`;
+    container.appendChild(image);
+  }
+
+  if (videoUrl) {
+    const video = document.createElement("video");
+    video.src = videoUrl;
+    video.controls = true;
+    video.preload = "metadata";
+    container.appendChild(video);
+  }
+}
+
+function bindPostActions(node, post) {
+  const saveButton = node.querySelector(".post-action--save");
+  const shareButton = node.querySelector(".post-action--share");
+  const commentButton = node.querySelector(".post-action--comment");
+
+  saveButton.classList.toggle("is-active", state.savedPosts.has(post.id));
+  saveButton.textContent = state.savedPosts.has(post.id) ? "Salvo" : "Salvar";
+  saveButton.addEventListener("click", () => {
+    withDelay(saveButton, () => toggleSavedPost(post.id));
+  });
+
+  shareButton.addEventListener("click", async () => {
+    await withDelay(shareButton, async () => {
+      const url = `${window.location.origin}${window.location.pathname}#post-${post.id}`;
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(url);
+        feedbackEl.textContent = "Link do relato copiado para a área de transferência.";
+      } else {
+        feedbackEl.textContent = "Não foi possível copiar o link deste relato.";
+      }
+    });
+  });
+
+  commentButton.addEventListener("click", () => {
+    withDelay(commentButton, () => {
+      feedbackEl.textContent = "Comentários ainda não foram abertos neste círculo.";
+    });
+  });
+}
+
+function toggleSavedPost(postId) {
+  if (state.savedPosts.has(postId)) {
+    state.savedPosts.delete(postId);
+  } else {
+    state.savedPosts.add(postId);
+  }
+  window.localStorage.setItem(SAVED_POSTS_KEY, JSON.stringify([...state.savedPosts]));
+  renderPosts();
 }
 
 function updateAtmosphericSignals() {
@@ -626,9 +891,12 @@ function updateAtmosphericSignals() {
   unknownUsersCountEl.textContent = String(activeUnknown);
   newReportsCountEl.textContent = String(newReports);
   if (latestPost) {
-    lastActivityEl.textContent = `Última atividade detectada: ${formatDate(latestPost.created_at)} em c/${GROUPS.find((group) => group.id === latestPost.group_id)?.nome || "Círculo"}.`;
+    const activityText = `Última atividade detectada: ${formatDate(latestPost.created_at)} em c/${GROUPS.find((group) => group.id === latestPost.group_id)?.nome || "Círculo"}.`;
+    lastActivityEl.textContent = activityText;
+    rightLastActivityEl.textContent = activityText;
   } else {
     lastActivityEl.textContent = "Última atividade detectada: nenhum rastro confirmado.";
+    rightLastActivityEl.textContent = "Última atividade detectada: nenhum rastro confirmado.";
   }
 
   window.localStorage.setItem(LAST_VISIT_KEY, String(Date.now()));
@@ -640,6 +908,145 @@ function rotateSystemWhisper() {
 
 function hydrateAmbientState() {
   autoRainEl.checked = window.localStorage.getItem(AUTO_RAIN_KEY) === "true";
+  state.savedPosts = new Set(JSON.parse(window.localStorage.getItem(SAVED_POSTS_KEY) || "[]"));
+}
+
+function setPostType(type) {
+  postTypeInputEl.value = type;
+  modeChips.forEach((chip) => {
+    chip.classList.toggle("is-active", chip.dataset.postType === type);
+  });
+  formEl.classList.remove("is-collapsed");
+  const wantsText = type === "text" || type === "mixed";
+  const wantsImage = type === "image" || type === "mixed";
+  const wantsVideo = type === "video";
+  contentInputEl.parentElement.classList.toggle("is-hidden", !wantsText);
+  imageUploadEl.closest(".media-field").classList.toggle("is-hidden", !wantsImage && type !== "video");
+  videoUploadEl.closest(".media-field").classList.toggle("is-hidden", !(wantsVideo || type === "mixed"));
+  if (type === "image") {
+    videoUploadEl.value = "";
+  }
+  if (type === "video") {
+    imageUploadEl.value = "";
+  }
+  updateMediaPreview();
+}
+
+function collapseComposer() {
+  formEl.classList.add("is-collapsed");
+  formEl.reset();
+  postTypeInputEl.value = "text";
+  modeChips.forEach((chip) => chip.classList.toggle("is-active", chip.dataset.postType === "text"));
+  contentInputEl.parentElement.classList.remove("is-hidden");
+  imageUploadEl.closest(".media-field").classList.remove("is-hidden");
+  videoUploadEl.closest(".media-field").classList.remove("is-hidden");
+  imagePreviewEl.src = "";
+  videoPreviewEl.src = "";
+  imagePreviewEl.classList.add("is-hidden");
+  videoPreviewEl.classList.add("is-hidden");
+  mediaPreviewEl.classList.add("is-hidden");
+}
+
+async function updateMediaPreview() {
+  const imageFile = imageUploadEl.files?.[0];
+  const videoFile = videoUploadEl.files?.[0];
+  imagePreviewEl.classList.add("is-hidden");
+  videoPreviewEl.classList.add("is-hidden");
+  mediaPreviewEl.classList.toggle("is-hidden", !imageFile && !videoFile);
+
+  if (imageFile) {
+    imagePreviewEl.src = await readFileAsDataUrl(imageFile);
+    imagePreviewEl.classList.remove("is-hidden");
+  }
+
+  if (videoFile) {
+    videoPreviewEl.src = await readFileAsDataUrl(videoFile);
+    videoPreviewEl.classList.remove("is-hidden");
+  }
+}
+
+function validateMediaFile(file, type) {
+  if (!file) {
+    return "";
+  }
+  const sizeLimit = type === "image" ? 5 * 1024 * 1024 : 20 * 1024 * 1024;
+  if (file.size > sizeLimit) {
+    return type === "image" ? "Imagens devem ter no máximo 5 MB." : "Vídeos devem ter no máximo 20 MB.";
+  }
+  if (type === "image" && !file.type.startsWith("image/")) {
+    return "O arquivo selecionado não é uma imagem válida.";
+  }
+  if (type === "video" && !file.type.startsWith("video/")) {
+    return "O arquivo selecionado não é um vídeo válido.";
+  }
+  return "";
+}
+
+function validateComposer(title, content, postType, imageFile, videoFile) {
+  if (!title) {
+    return "Defina um título para o registro.";
+  }
+  if ((postType === "text" || postType === "mixed") && !content) {
+    return "Escreva o relato antes de arquivar.";
+  }
+  if (postType === "image" && !imageFile) {
+    return "Anexe uma imagem para este tipo de ocorrência.";
+  }
+  if (postType === "video" && !videoFile) {
+    return "Anexe um vídeo para este tipo de ocorrência.";
+  }
+  if (postType === "mixed" && !content && !imageFile && !videoFile) {
+    return "Relatos mistos precisam de texto e pelo menos um anexo.";
+  }
+  return validateMediaFile(imageFile, "image") || validateMediaFile(videoFile, "video");
+}
+
+function normalizePostType(postType, imageUrl, videoUrl) {
+  if (videoUrl && imageUrl) {
+    return "mixed";
+  }
+  if (videoUrl && postType !== "text") {
+    return postType === "mixed" ? "mixed" : "video";
+  }
+  if (imageUrl && postType !== "text") {
+    return postType === "mixed" ? "mixed" : "image";
+  }
+  return "text";
+}
+
+function renderRecommendedGroups() {
+  recommendedGroupsEl.innerHTML = "";
+  GROUPS.filter((group) => group.id !== "todos" && group.id !== state.selectedGroup)
+    .slice(0, 3)
+    .forEach((group) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "group-button";
+      button.innerHTML = `<strong>c/${group.nome}</strong><small>${group.descricao}</small>`;
+      button.addEventListener("click", () => {
+        withDelay(button, () => {
+          state.selectedGroup = group.id;
+          state.filter = "all";
+          filterButtons.forEach((item) => item.classList.toggle("is-active", item.dataset.filter === "all"));
+          syncActiveGroup();
+          syncActiveNav("circles");
+          renderPosts();
+        });
+      });
+      recommendedGroupsEl.appendChild(button);
+    });
+}
+
+function renderCircleRules() {
+  const rules = CIRCLE_RULES[state.selectedGroup] || CIRCLE_RULES.todos;
+  circleRulesEl.innerHTML = `<p>Leituras atuais para ${state.selectedGroup === "todos" ? "o arquivo geral" : `c/${GROUPS.find((group) => group.id === state.selectedGroup)?.nome || "Círculo"}`}:</p>`;
+  const list = document.createElement("ul");
+  rules.forEach((rule) => {
+    const item = document.createElement("li");
+    item.textContent = rule;
+    list.appendChild(item);
+  });
+  circleRulesEl.appendChild(list);
 }
 
 async function maybeAutostartRain() {
