@@ -31,11 +31,13 @@ const GROUPS = [
 const state = {
   selectedGroup: "todos",
   filter: "all",
+  searchTerm: "",
   posts: [],
   currentUser: null,
   currentProfile: null,
   votes: {},
-  savedPosts: new Set()
+  savedPosts: new Set(),
+  comments: {}
 };
 
 const supabaseUrl = window.ACRETA_SUPABASE_URL || "";
@@ -72,13 +74,27 @@ const navButtons = Array.from(document.querySelectorAll(".nav-button"));
 const modeChips = Array.from(document.querySelectorAll(".mode-chip"));
 const composerToggleEl = document.querySelector("#composer-toggle");
 const composerCancelEl = document.querySelector("#composer-cancel");
+const sidebarToggleEl = document.querySelector("#sidebar-toggle");
+const sidebarOverlayEl = document.querySelector("#sidebar-overlay");
+const leftSidebarEl = document.querySelector(".sidebar--left");
+const searchInputEl = document.querySelector("#search-input");
 const postTypeInputEl = document.querySelector("#post-type");
 const contentInputEl = document.querySelector("#content");
 const imageUploadEl = document.querySelector("#image-upload");
 const videoUploadEl = document.querySelector("#video-upload");
+const imageDropzoneEl = document.querySelector("#image-dropzone");
+const videoDropzoneEl = document.querySelector("#video-dropzone");
 const mediaPreviewEl = document.querySelector("#media-preview");
 const imagePreviewEl = document.querySelector("#image-preview");
 const videoPreviewEl = document.querySelector("#video-preview");
+const imagePreviewCardEl = document.querySelector("#image-preview-card");
+const videoPreviewCardEl = document.querySelector("#video-preview-card");
+const imagePreviewNameEl = document.querySelector("#image-preview-name");
+const imagePreviewInfoEl = document.querySelector("#image-preview-info");
+const videoPreviewNameEl = document.querySelector("#video-preview-name");
+const videoPreviewInfoEl = document.querySelector("#video-preview-info");
+const removeImageEl = document.querySelector("#remove-image");
+const removeVideoEl = document.querySelector("#remove-video");
 const profileNameEl = document.querySelector("#profile-name");
 const profileEmailEl = document.querySelector("#profile-email");
 const profilePostCountEl = document.querySelector("#profile-post-count");
@@ -103,14 +119,29 @@ const rightLastActivityEl = document.querySelector("#right-last-activity");
 const systemWhisperEl = document.querySelector("#system-whisper");
 const recommendedGroupsEl = document.querySelector("#recommended-groups");
 const circleRulesEl = document.querySelector("#circle-rules");
+const topTagEl = document.querySelector("#top-tag");
+const unclassifiedCountEl = document.querySelector("#unclassified-count");
+const latestEntryEl = document.querySelector("#latest-entry");
+const savedCountEl = document.querySelector("#saved-count");
+const postModalEl = document.querySelector("#post-modal");
+const modalTitleEl = document.querySelector("#modal-title");
+const modalPostEl = document.querySelector("#modal-post");
+const modalCloseEl = document.querySelector("#modal-close");
+const commentFormEl = document.querySelector("#comment-form");
+const commentInputEl = document.querySelector("#comment-input");
+const commentFeedbackEl = document.querySelector("#comment-feedback");
+const commentsListEl = document.querySelector("#comments-list");
+const relatedPostsEl = document.querySelector("#related-posts");
 
 let audioContext = null;
 let rainNodes = null;
 let thunderTimer = null;
+let activePostId = null;
 
 const LAST_VISIT_KEY = "acreta-last-visit";
 const AUTO_RAIN_KEY = "acreta-auto-rain";
 const SAVED_POSTS_KEY = "acreta-saved-posts";
+const COMMENTS_KEY = "acreta-comments";
 const SYSTEM_WHISPERS = [
   "Os relatórios estão começando a aparecer.",
   "Três arquivos foram movidos sem registro de acesso.",
@@ -291,6 +322,9 @@ function bindAuthEvents() {
 }
 
 function bindAppEvents() {
+  sidebarToggleEl.addEventListener("click", () => toggleMobileSidebar(true));
+  sidebarOverlayEl.addEventListener("click", () => toggleMobileSidebar(false));
+
   composerToggleEl.addEventListener("click", () => {
     withDelay(composerToggleEl, () => {
       formEl.classList.remove("is-collapsed");
@@ -314,8 +348,27 @@ function bindAppEvents() {
     });
   });
 
-  imageUploadEl.addEventListener("change", async () => {
+  searchInputEl.addEventListener("input", () => {
+    state.searchTerm = searchInputEl.value.trim().toLowerCase();
+    renderPosts();
+  });
+
+  setupDropzone(imageDropzoneEl, imageUploadEl, "image");
+  setupDropzone(videoDropzoneEl, videoUploadEl, "video");
+
+  removeImageEl.addEventListener("click", () => {
+    imageUploadEl.value = "";
+    updateMediaPreview();
+    feedbackEl.textContent = "Anexo de imagem removido.";
+  });
+
+  removeVideoEl.addEventListener("click", () => {
     videoUploadEl.value = "";
+    updateMediaPreview();
+    feedbackEl.textContent = "Anexo de vídeo removido.";
+  });
+
+  imageUploadEl.addEventListener("change", async () => {
     const validation = validateMediaFile(imageUploadEl.files?.[0], "image");
     if (validation) {
       feedbackEl.textContent = validation;
@@ -328,7 +381,6 @@ function bindAppEvents() {
   });
 
   videoUploadEl.addEventListener("change", async () => {
-    imageUploadEl.value = "";
     const validation = validateMediaFile(videoUploadEl.files?.[0], "video");
     if (validation) {
       feedbackEl.textContent = validation;
@@ -366,6 +418,7 @@ function bindAppEvents() {
       return;
     }
 
+    feedbackEl.textContent = "Arquivando ocorrência...";
     const imageUrl = imageFile ? await readFileAsDataUrl(imageFile) : "";
     const videoUrl = videoFile ? await readFileAsDataUrl(videoFile) : "";
 
@@ -397,10 +450,14 @@ function bindAppEvents() {
     formEl.reset();
     collapseComposer();
     authorInputEl.value = state.currentProfile.display_name;
-    feedbackEl.textContent = "Registro anexado ao arquivo.";
+    feedbackEl.textContent = "Ocorrência arquivada com sucesso.";
     state.selectedGroup = groupId;
     syncActiveGroup();
     await refreshData();
+    const newest = state.posts[0];
+    if (newest) {
+      document.querySelector(`#post-${newest.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
   });
 
   profileFormEl.addEventListener("submit", async (event) => {
@@ -522,6 +579,18 @@ function bindAppEvents() {
 
   autoRainEl.addEventListener("change", () => {
     window.localStorage.setItem(AUTO_RAIN_KEY, String(autoRainEl.checked));
+  });
+
+  modalCloseEl.addEventListener("click", () => closePostModal());
+  postModalEl.addEventListener("click", (event) => {
+    if (event.target === postModalEl) {
+      closePostModal();
+    }
+  });
+
+  commentFormEl.addEventListener("submit", (event) => {
+    event.preventDefault();
+    saveComment();
   });
 }
 
@@ -670,12 +739,14 @@ function syncActiveNav(activeNav) {
 function applyNav(nav) {
   if (nav === "circles") {
     syncActiveNav(nav);
+    toggleMobileSidebar(false);
     document.querySelector(".card--groups")?.scrollIntoView({ behavior: "smooth", block: "start" });
     return;
   }
 
   if (nav === "identity") {
     syncActiveNav(nav);
+    toggleMobileSidebar(false);
     document.querySelector(".card--profile-edit")?.scrollIntoView({ behavior: "smooth", block: "start" });
     return;
   }
@@ -685,6 +756,7 @@ function applyNav(nav) {
   filterButtons.forEach((item) => item.classList.toggle("is-active", item.dataset.filter === state.filter));
   syncActiveGroup();
   syncActiveNav(nav);
+  toggleMobileSidebar(false);
   renderPosts();
 }
 
@@ -697,10 +769,7 @@ function renderPosts() {
   if (!visiblePosts.length) {
     const emptyState = document.createElement("article");
     emptyState.className = "empty-state";
-    emptyState.innerHTML = `
-      <h4>Nenhum registro detectado</h4>
-      <p>Troque o círculo, ajuste o filtro ou anexe a primeira entrada deste arquivo.</p>
-    `;
+    emptyState.innerHTML = getEmptyStateMarkup();
     postFeedEl.appendChild(emptyState);
     return;
   }
@@ -795,6 +864,22 @@ function getVisiblePosts() {
     posts.sort((a, b) => (b.votes_count || 0) - (a.votes_count || 0));
   }
 
+  if (state.searchTerm) {
+    posts = posts.filter((post) => {
+      const haystack = [
+        post.title,
+        post.content,
+        post.author_display,
+        post.author_username,
+        GROUPS.find((group) => group.id === post.group_id)?.nome || "",
+        ...(post.tags || [])
+      ]
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(state.searchTerm);
+    });
+  }
+
   return posts;
 }
 
@@ -818,6 +903,31 @@ function getFeedTitle(currentGroup) {
     return "Registros longos";
   }
   return "Todos os registros";
+}
+
+function getEmptyStateMarkup() {
+  if (state.searchTerm) {
+    return `
+      <h4>Nenhum registro encontrado</h4>
+      <p>Nada corresponde a "${escapeHtml(state.searchTerm)}". Revise a busca ou tente outro círculo.</p>
+    `;
+  }
+  if (state.filter === "saved") {
+    return `
+      <h4>Nenhum item salvo</h4>
+      <p>Salve um registro para reencontrá-lo mais tarde.</p>
+    `;
+  }
+  if (state.filter === "recent") {
+    return `
+      <h4>Nenhuma atividade recente</h4>
+      <p>Este arquivo ainda não recebeu novos sinais nesta janela.</p>
+    `;
+  }
+  return `
+    <h4>Nenhum registro detectado</h4>
+    <p>Troque o círculo, ajuste o filtro ou anexe a primeira entrada deste arquivo.</p>
+  `;
 }
 
 function renderPostMedia(container, post) {
@@ -846,6 +956,7 @@ function bindPostActions(node, post) {
   const saveButton = node.querySelector(".post-action--save");
   const shareButton = node.querySelector(".post-action--share");
   const commentButton = node.querySelector(".post-action--comment");
+  const openButton = node.querySelector(".post-action--open");
 
   saveButton.classList.toggle("is-active", state.savedPosts.has(post.id));
   saveButton.textContent = state.savedPosts.has(post.id) ? "Salvo" : "Salvar";
@@ -866,9 +977,11 @@ function bindPostActions(node, post) {
   });
 
   commentButton.addEventListener("click", () => {
-    withDelay(commentButton, () => {
-      feedbackEl.textContent = "Comentários ainda não foram abertos neste círculo.";
-    });
+    withDelay(commentButton, () => openPostModal(post.id));
+  });
+
+  openButton.addEventListener("click", () => {
+    withDelay(openButton, () => openPostModal(post.id));
   });
 }
 
@@ -879,6 +992,7 @@ function toggleSavedPost(postId) {
     state.savedPosts.add(postId);
   }
   window.localStorage.setItem(SAVED_POSTS_KEY, JSON.stringify([...state.savedPosts]));
+  updateAtmosphericSignals();
   renderPosts();
 }
 
@@ -887,16 +1001,33 @@ function updateAtmosphericSignals() {
   const newReports = state.posts.filter((post) => new Date(post.created_at).getTime() > previousVisit).length;
   const activeUnknown = 4 + Math.min(19, state.posts.length + Math.floor(Math.random() * 4));
   const latestPost = state.posts[0];
+  const tagCounts = new Map();
+  let unclassified = 0;
+
+  state.posts.forEach((post) => {
+    if (!post.tags?.length) {
+      unclassified += 1;
+    }
+    (post.tags || []).forEach((tag) => {
+      tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1);
+    });
+  });
+  const topTag = [...tagCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] || "sem-tag";
 
   unknownUsersCountEl.textContent = String(activeUnknown);
   newReportsCountEl.textContent = String(newReports);
+  topTagEl.textContent = `#${topTag}`;
+  unclassifiedCountEl.textContent = String(unclassified);
+  savedCountEl.textContent = state.savedPosts.size ? `${state.savedPosts.size} relato(s) salvo(s).` : "Nenhum item salvo.";
   if (latestPost) {
     const activityText = `Última atividade detectada: ${formatDate(latestPost.created_at)} em c/${GROUPS.find((group) => group.id === latestPost.group_id)?.nome || "Círculo"}.`;
     lastActivityEl.textContent = activityText;
     rightLastActivityEl.textContent = activityText;
+    latestEntryEl.textContent = `Último registro arquivado: ${latestPost.title}.`;
   } else {
     lastActivityEl.textContent = "Última atividade detectada: nenhum rastro confirmado.";
     rightLastActivityEl.textContent = "Última atividade detectada: nenhum rastro confirmado.";
+    latestEntryEl.textContent = "Último registro arquivado: nenhum.";
   }
 
   window.localStorage.setItem(LAST_VISIT_KEY, String(Date.now()));
@@ -909,6 +1040,7 @@ function rotateSystemWhisper() {
 function hydrateAmbientState() {
   autoRainEl.checked = window.localStorage.getItem(AUTO_RAIN_KEY) === "true";
   state.savedPosts = new Set(JSON.parse(window.localStorage.getItem(SAVED_POSTS_KEY) || "[]"));
+  state.comments = JSON.parse(window.localStorage.getItem(COMMENTS_KEY) || "{}");
 }
 
 function setPostType(type) {
@@ -919,10 +1051,10 @@ function setPostType(type) {
   formEl.classList.remove("is-collapsed");
   const wantsText = type === "text" || type === "mixed";
   const wantsImage = type === "image" || type === "mixed";
-  const wantsVideo = type === "video";
+  const wantsVideo = type === "video" || type === "mixed";
   contentInputEl.parentElement.classList.toggle("is-hidden", !wantsText);
-  imageUploadEl.closest(".media-field").classList.toggle("is-hidden", !wantsImage && type !== "video");
-  videoUploadEl.closest(".media-field").classList.toggle("is-hidden", !(wantsVideo || type === "mixed"));
+  imageUploadEl.closest(".media-field").classList.toggle("is-hidden", !wantsImage);
+  videoUploadEl.closest(".media-field").classList.toggle("is-hidden", !wantsVideo);
   if (type === "image") {
     videoUploadEl.value = "";
   }
@@ -942,26 +1074,38 @@ function collapseComposer() {
   videoUploadEl.closest(".media-field").classList.remove("is-hidden");
   imagePreviewEl.src = "";
   videoPreviewEl.src = "";
-  imagePreviewEl.classList.add("is-hidden");
-  videoPreviewEl.classList.add("is-hidden");
+  imagePreviewCardEl.classList.add("is-hidden");
+  videoPreviewCardEl.classList.add("is-hidden");
+  imagePreviewNameEl.textContent = "";
+  imagePreviewInfoEl.textContent = "";
+  videoPreviewNameEl.textContent = "";
+  videoPreviewInfoEl.textContent = "";
   mediaPreviewEl.classList.add("is-hidden");
 }
 
 async function updateMediaPreview() {
   const imageFile = imageUploadEl.files?.[0];
   const videoFile = videoUploadEl.files?.[0];
-  imagePreviewEl.classList.add("is-hidden");
-  videoPreviewEl.classList.add("is-hidden");
+  imagePreviewCardEl.classList.add("is-hidden");
+  videoPreviewCardEl.classList.add("is-hidden");
   mediaPreviewEl.classList.toggle("is-hidden", !imageFile && !videoFile);
 
   if (imageFile) {
     imagePreviewEl.src = await readFileAsDataUrl(imageFile);
-    imagePreviewEl.classList.remove("is-hidden");
+    imagePreviewNameEl.textContent = imageFile.name;
+    imagePreviewInfoEl.textContent = await getImageInfo(imagePreviewEl.src, imageFile);
+    imagePreviewCardEl.classList.remove("is-hidden");
   }
 
   if (videoFile) {
     videoPreviewEl.src = await readFileAsDataUrl(videoFile);
-    videoPreviewEl.classList.remove("is-hidden");
+    videoPreviewNameEl.textContent = videoFile.name;
+    videoPreviewInfoEl.textContent = await getVideoInfo(videoPreviewEl, videoFile);
+    videoPreviewCardEl.classList.remove("is-hidden");
+  }
+
+  if (!imageFile && !videoFile) {
+    feedbackEl.textContent = "Nenhum anexo foi carregado.";
   }
 }
 
@@ -1047,6 +1191,223 @@ function renderCircleRules() {
     list.appendChild(item);
   });
   circleRulesEl.appendChild(list);
+}
+
+function setupDropzone(dropzone, input, type) {
+  ["dragenter", "dragover"].forEach((eventName) => {
+    dropzone.addEventListener(eventName, (event) => {
+      event.preventDefault();
+      dropzone.classList.add("is-dragover");
+    });
+  });
+
+  ["dragleave", "drop"].forEach((eventName) => {
+    dropzone.addEventListener(eventName, (event) => {
+      event.preventDefault();
+      dropzone.classList.remove("is-dragover");
+    });
+  });
+
+  dropzone.addEventListener("drop", (event) => {
+    const [file] = [...(event.dataTransfer?.files || [])];
+    if (!file) {
+      return;
+    }
+    const message = validateMediaFile(file, type);
+    if (message) {
+      feedbackEl.textContent = message;
+      return;
+    }
+    const transfer = new DataTransfer();
+    transfer.items.add(file);
+    input.files = transfer.files;
+    input.dispatchEvent(new Event("change"));
+  });
+
+  dropzone.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      input.click();
+    }
+  });
+}
+
+function toggleMobileSidebar(visible) {
+  if (window.innerWidth > 720) {
+    return;
+  }
+  leftSidebarEl.classList.toggle("is-open", visible);
+  sidebarOverlayEl.classList.toggle("is-hidden", !visible);
+  sidebarOverlayEl.classList.toggle("is-visible", visible);
+}
+
+async function getImageInfo(src, file) {
+  const dimensions = await new Promise((resolve) => {
+    const image = new Image();
+    image.onload = () => resolve(`${image.naturalWidth}x${image.naturalHeight}px`);
+    image.onerror = () => resolve("dimensões indisponíveis");
+    image.src = src;
+  });
+  return `${dimensions} • ${formatBytes(file.size)}`;
+}
+
+async function getVideoInfo(videoEl, file) {
+  return new Promise((resolve) => {
+    const handle = () => {
+      videoEl.removeEventListener("loadedmetadata", handle);
+      resolve(`${formatDuration(videoEl.duration)} • ${formatBytes(file.size)}`);
+    };
+    videoEl.addEventListener("loadedmetadata", handle);
+  });
+}
+
+function formatBytes(bytes) {
+  if (!bytes) {
+    return "0 B";
+  }
+  const units = ["B", "KB", "MB", "GB"];
+  const power = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+  const value = bytes / 1024 ** power;
+  return `${value.toFixed(value >= 10 || power === 0 ? 0 : 1)} ${units[power]}`;
+}
+
+function formatDuration(seconds) {
+  if (!Number.isFinite(seconds)) {
+    return "duração indisponível";
+  }
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60);
+  return `${mins}:${String(secs).padStart(2, "0")}`;
+}
+
+function openPostModal(postId) {
+  const post = state.posts.find((item) => item.id === postId);
+  if (!post) {
+    return;
+  }
+  activePostId = postId;
+  commentFeedbackEl.textContent = "";
+  commentInputEl.value = "";
+  const group = GROUPS.find((item) => item.id === post.group_id);
+  modalTitleEl.textContent = post.title;
+  modalPostEl.innerHTML = `
+    <div class="post-modal__body">
+      <div class="post-meta">
+        <span class="post-group">c/${group?.nome || "Círculo"}</span>
+        <span class="post-author" style="color:${post.author_text_color || "#f5eef8"}">por u/${post.author_display}</span>
+        <span class="post-date">${formatDate(post.created_at)}</span>
+      </div>
+      <p class="post-owner">rastro do autor: ${post.author_username}</p>
+      ${renderModalMedia(post)}
+      ${post.content ? `<p class="post-text">${escapeHtml(post.content)}</p>` : ""}
+      <div class="post-actions">
+        <button class="post-action post-action--save ${state.savedPosts.has(post.id) ? "is-active" : ""}" type="button" data-modal-save="${post.id}">${state.savedPosts.has(post.id) ? "Salvo" : "Salvar"}</button>
+        <button class="post-action post-action--share" type="button" data-modal-share="${post.id}">Compartilhar</button>
+      </div>
+    </div>
+  `;
+  modalPostEl.querySelector("[data-modal-save]")?.addEventListener("click", () => toggleSavedPost(post.id));
+  modalPostEl.querySelector("[data-modal-share]")?.addEventListener("click", async () => {
+    const url = `${window.location.origin}${window.location.pathname}#post-${post.id}`;
+    await navigator.clipboard?.writeText(url);
+    commentFeedbackEl.textContent = "Link do registro copiado.";
+  });
+  renderComments(post.id);
+  renderRelatedPosts(post);
+  if (typeof postModalEl.showModal === "function") {
+    postModalEl.showModal();
+  }
+}
+
+function closePostModal() {
+  activePostId = null;
+  if (postModalEl.open) {
+    postModalEl.close();
+  }
+}
+
+function renderModalMedia(post) {
+  const parts = [];
+  if (post.media_image_url) {
+    parts.push(`<div class="post-media"><img src="${post.media_image_url}" alt="Anexo visual do relato ${escapeHtml(post.title)}"></div>`);
+  }
+  if (post.media_video_url) {
+    parts.push(`<div class="post-media"><video src="${post.media_video_url}" controls preload="metadata"></video></div>`);
+  }
+  return parts.join("");
+}
+
+function renderComments(postId) {
+  const comments = state.comments[postId] || [];
+  commentsListEl.innerHTML = "";
+  if (!comments.length) {
+    commentsListEl.innerHTML = `<article class="comment-card"><div class="comment-card__meta">Nenhum comentário ainda.</div><p>Se você ficou até aqui, deixe um rastro.</p></article>`;
+    return;
+  }
+  comments.forEach((comment) => {
+    const article = document.createElement("article");
+    article.className = `comment-card${comment.authorId === state.currentUser?.id ? " comment-card--author" : ""}`;
+    article.innerHTML = `
+      <div class="comment-card__meta">u/${comment.authorDisplay} • ${formatDate(comment.createdAt)}${comment.authorId === state.currentUser?.id ? " • autor atual" : ""}</div>
+      <p>${escapeHtml(comment.content)}</p>
+    `;
+    commentsListEl.appendChild(article);
+  });
+}
+
+function saveComment() {
+  if (!activePostId || !state.currentUser || !state.currentProfile) {
+    return;
+  }
+  const content = commentInputEl.value.trim();
+  if (!content) {
+    commentFeedbackEl.textContent = "Escreva algo antes de salvar o comentário.";
+    return;
+  }
+  const entry = {
+    id: crypto.randomUUID(),
+    authorId: state.currentUser.id,
+    authorDisplay: state.currentProfile.display_name,
+    content,
+    createdAt: new Date().toISOString()
+  };
+  state.comments[activePostId] = [...(state.comments[activePostId] || []), entry];
+  window.localStorage.setItem(COMMENTS_KEY, JSON.stringify(state.comments));
+  commentInputEl.value = "";
+  commentFeedbackEl.textContent = "Comentário salvo sob o registro.";
+  renderComments(activePostId);
+}
+
+function renderRelatedPosts(post) {
+  relatedPostsEl.innerHTML = "";
+  const related = state.posts
+    .filter((item) => item.id !== post.id && item.group_id === post.group_id)
+    .slice(0, 3);
+  if (!related.length) {
+    relatedPostsEl.innerHTML = `<article class="related-post"><h4 class="related-post__title">Nenhum outro rastro neste círculo.</h4><p class="related-post__excerpt">Arquivos relacionados aparecerão quando mais registros forem anexados.</p></article>`;
+    return;
+  }
+  related.forEach((item) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "related-post";
+    button.innerHTML = `
+      <h4 class="related-post__title">${escapeHtml(item.title)}</h4>
+      <div class="related-post__meta">${formatDate(item.created_at)} • u/${item.author_display}</div>
+      <p class="related-post__excerpt">${escapeHtml((item.content || "").slice(0, 140))}${item.content?.length > 140 ? "..." : ""}</p>
+    `;
+    button.addEventListener("click", () => openPostModal(item.id));
+    relatedPostsEl.appendChild(button);
+  });
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 async function maybeAutostartRain() {

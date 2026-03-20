@@ -72,6 +72,7 @@
     <header class="hero hero--compact">
       <div class="hero__veil"></div>
       <nav class="topbar">
+        <button id="sidebar-toggle" class="topbar__action topbar__menu" type="button">Menu</button>
         <div class="brand">
           <span class="brand__mark">A</span>
           <div>
@@ -85,6 +86,10 @@
           <p class="hero__text">Os relatórios continuam surgindo. Leia pouco e saia cedo.</p>
         </div>
         <div class="topbar__controls">
+          <label class="search-shell" for="search-input">
+            <span class="search-shell__label">Busca</span>
+            <input id="search-input" class="search-shell__input" type="search" placeholder="Buscar por título, tag, círculo ou autor">
+          </label>
           <div class="session-user">
             <img id="session-avatar" class="session-avatar" alt="Foto do perfil">
             <p id="session-indicator" class="session-indicator"></p>
@@ -99,6 +104,7 @@
       </div>
     </header>
 
+    <div id="sidebar-overlay" class="sidebar-overlay is-hidden"></div>
     <main class="layout layout--reddit">
       <aside class="sidebar sidebar--left">
         <section class="card card--profile">
@@ -174,7 +180,7 @@
               </label>
 
               <label>
-                <span>Relato</span>
+                <span>Autor</span>
                 <input id="author" name="author" type="text" maxlength="28" required readonly>
               </label>
             </div>
@@ -190,14 +196,20 @@
             </label>
 
             <div class="composer__media-grid">
-              <label class="media-field media-field--image">
-                <span>Anexar imagem</span>
-                <input id="image-upload" name="imageUpload" type="file" accept="image/png,image/jpeg,image/webp,image/gif">
-              </label>
-              <label class="media-field media-field--video">
-                <span>Anexar vídeo</span>
-                <input id="video-upload" name="videoUpload" type="file" accept="video/mp4,video/webm,video/ogg">
-              </label>
+              <section id="image-dropzone" class="media-field media-field--image dropzone" tabindex="0" role="button" aria-label="Anexar imagem">
+                <div class="dropzone__copy">
+                  <span class="dropzone__title">Anexar imagem</span>
+                  <span class="dropzone__hint">Arraste um arquivo ou clique para anexar</span>
+                </div>
+                <input id="image-upload" name="imageUpload" class="dropzone__input" type="file" accept="image/png,image/jpeg,image/webp,image/gif">
+              </section>
+              <section id="video-dropzone" class="media-field media-field--video dropzone" tabindex="0" role="button" aria-label="Anexar vídeo">
+                <div class="dropzone__copy">
+                  <span class="dropzone__title">Anexar vídeo</span>
+                  <span class="dropzone__hint">Arraste um arquivo ou clique para anexar</span>
+                </div>
+                <input id="video-upload" name="videoUpload" class="dropzone__input" type="file" accept="video/mp4,video/webm,video/ogg">
+              </section>
             </div>
 
             <section id="media-preview" class="media-preview is-hidden">
@@ -206,8 +218,22 @@
                 <span>antes de arquivar</span>
               </div>
               <div class="media-preview__body">
-                <img id="image-preview" class="media-preview__image is-hidden" alt="Pré-visualização da imagem">
-                <video id="video-preview" class="media-preview__video is-hidden" controls preload="metadata"></video>
+                <article id="image-preview-card" class="media-preview__card is-hidden">
+                  <img id="image-preview" class="media-preview__image" alt="Pré-visualização da imagem">
+                  <div class="media-preview__meta">
+                    <p id="image-preview-name" class="media-preview__name"></p>
+                    <p id="image-preview-info" class="media-preview__info"></p>
+                  </div>
+                  <button id="remove-image" class="button button--secondary" type="button">Remover imagem</button>
+                </article>
+                <article id="video-preview-card" class="media-preview__card is-hidden">
+                  <video id="video-preview" class="media-preview__video" controls preload="metadata"></video>
+                  <div class="media-preview__meta">
+                    <p id="video-preview-name" class="media-preview__name"></p>
+                    <p id="video-preview-info" class="media-preview__info"></p>
+                  </div>
+                  <button id="remove-video" class="button button--secondary" type="button">Remover vídeo</button>
+                </article>
               </div>
             </section>
 
@@ -264,6 +290,8 @@
           <div class="signal-stack">
             <p class="signal-pill"><strong id="unknown-users-count">7</strong> presenças sem identificação.</p>
             <p id="right-last-activity" class="signal-pill">Última atividade detectada: aguardando leitura...</p>
+            <p class="signal-pill"><strong id="top-tag">#arquivo</strong> tag mais recorrente nesta sessão.</p>
+            <p class="signal-pill"><strong id="unclassified-count">0</strong> ocorrências não classificadas.</p>
           </div>
         </section>
 
@@ -281,6 +309,17 @@
             <span>regras ativas</span>
           </div>
           <div id="circle-rules" class="rules-box"></div>
+        </section>
+
+        <section class="card card--system">
+          <div class="card__header">
+            <h3>Sistema vivo</h3>
+            <span>rastros recentes</span>
+          </div>
+          <div class="signal-stack">
+            <p id="latest-entry" class="signal-pill">Último registro arquivado: aguardando.</p>
+            <p id="saved-count" class="signal-pill">Nenhum item salvo.</p>
+          </div>
         </section>
 
         <section class="card card--audio">
@@ -370,10 +409,42 @@
           <button class="post-action post-action--comment" type="button">Comentar</button>
           <button class="post-action post-action--save" type="button">Salvar</button>
           <button class="post-action post-action--share" type="button">Compartilhar</button>
+          <button class="post-action post-action--open" type="button">Abrir registro</button>
         </div>
       </div>
     </article>
   </template>
+
+  <dialog id="post-modal" class="post-modal">
+    <div class="post-modal__shell">
+      <div class="card__header">
+        <h3 id="modal-title">Registro</h3>
+        <button id="modal-close" class="button button--secondary" type="button">Fechar</button>
+      </div>
+      <article id="modal-post" class="post-modal__content"></article>
+      <section class="post-modal__comments">
+        <div class="card__header">
+          <h3>Comentários</h3>
+          <span>ecos abaixo do registro</span>
+        </div>
+        <form id="comment-form" class="comment-form">
+          <textarea id="comment-input" rows="4" placeholder="Responder a esta ocorrência..."></textarea>
+          <div class="composer__actions">
+            <p id="comment-feedback" class="composer__feedback" aria-live="polite"></p>
+            <button class="button button--primary" type="submit">Salvar comentário</button>
+          </div>
+        </form>
+        <div id="comments-list" class="comments-list"></div>
+      </section>
+      <section class="post-modal__related">
+        <div class="card__header">
+          <h3>Mais deste círculo</h3>
+          <span>relacionados</span>
+        </div>
+        <div id="related-posts" class="related-posts"></div>
+      </section>
+    </div>
+  </dialog>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabase-config.js"></script>
