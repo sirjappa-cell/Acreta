@@ -83,9 +83,24 @@ const resetAvatarEl = document.querySelector("#reset-avatar");
 const rainToggleEl = document.querySelector("#rain-toggle");
 const rainVolumeEl = document.querySelector("#rain-volume");
 const audioStatusEl = document.querySelector("#audio-status");
+const autoRainEl = document.querySelector("#auto-rain");
+const unknownUsersCountEl = document.querySelector("#unknown-users-count");
+const newReportsCountEl = document.querySelector("#new-reports-count");
+const lastActivityEl = document.querySelector("#last-activity");
+const systemWhisperEl = document.querySelector("#system-whisper");
 
 let audioContext = null;
 let rainNodes = null;
+let thunderTimer = null;
+
+const LAST_VISIT_KEY = "acreta-last-visit";
+const AUTO_RAIN_KEY = "acreta-auto-rain";
+const SYSTEM_WHISPERS = [
+  "Os relatórios estão começando a aparecer.",
+  "Três arquivos foram movidos sem registro de acesso.",
+  "Há nomes retornando aos círculos errados.",
+  "A atividade aumenta quando a chuva quase some."
+];
 
 renderGroupControls();
 bindAuthEvents();
@@ -93,6 +108,9 @@ bindAppEvents();
 boot();
 
 async function boot() {
+  hydrateAmbientState();
+  rotateSystemWhisper();
+
   if (!isSupabaseConfigured) {
     setupWarningEl.textContent = "Preencha supabase-config.js com a URL e a chave anon do seu projeto.";
     setupWarningEl.classList.remove("is-hidden");
@@ -110,19 +128,23 @@ async function boot() {
 
 function bindAuthEvents() {
   showLoginEl.addEventListener("click", () => {
-    showLoginEl.classList.add("is-active");
-    showRegisterEl.classList.remove("is-active");
-    loginFormEl.classList.remove("is-hidden");
-    registerFormEl.classList.add("is-hidden");
-    authFeedbackEl.textContent = "";
+    withDelay(showLoginEl, () => {
+      showLoginEl.classList.add("is-active");
+      showRegisterEl.classList.remove("is-active");
+      loginFormEl.classList.remove("is-hidden");
+      registerFormEl.classList.add("is-hidden");
+      authFeedbackEl.textContent = "";
+    });
   });
 
   showRegisterEl.addEventListener("click", () => {
-    showRegisterEl.classList.add("is-active");
-    showLoginEl.classList.remove("is-active");
-    registerFormEl.classList.remove("is-hidden");
-    loginFormEl.classList.add("is-hidden");
-    authFeedbackEl.textContent = "";
+    withDelay(showRegisterEl, () => {
+      showRegisterEl.classList.add("is-active");
+      showLoginEl.classList.remove("is-active");
+      registerFormEl.classList.remove("is-hidden");
+      loginFormEl.classList.add("is-hidden");
+      authFeedbackEl.textContent = "";
+    });
   });
 
   loginFormEl.addEventListener("submit", async (event) => {
@@ -243,7 +265,7 @@ function bindAppEvents() {
 
     formEl.reset();
     authorInputEl.value = state.currentProfile.display_name;
-    feedbackEl.textContent = "Relato publicado com sucesso.";
+    feedbackEl.textContent = "Registro anexado ao arquivo.";
     state.selectedGroup = groupId;
     syncActiveGroup();
     await refreshData();
@@ -295,7 +317,7 @@ function bindAppEvents() {
     }
 
     avatarFileInputEl.value = "";
-    profileFeedbackEl.textContent = "Perfil atualizado.";
+    profileFeedbackEl.textContent = "Identidade recalibrada.";
     await refreshData();
   });
 
@@ -324,16 +346,18 @@ function bindAppEvents() {
       return;
     }
 
-    profileFeedbackEl.textContent = "Foto removida.";
+    profileFeedbackEl.textContent = "Imagem de rastro removida.";
     await refreshData();
   });
 
   filterButtons.forEach((button) => {
     button.addEventListener("click", () => {
-      state.filter = button.dataset.filter || "all";
-      filterButtons.forEach((item) => item.classList.remove("is-active"));
-      button.classList.add("is-active");
-      renderPosts();
+      withDelay(button, () => {
+        state.filter = button.dataset.filter || "all";
+        filterButtons.forEach((item) => item.classList.remove("is-active"));
+        button.classList.add("is-active");
+        renderPosts();
+      });
     });
   });
 
@@ -348,27 +372,23 @@ function bindAppEvents() {
       await audioContext.resume();
     }
     if (rainNodes.enabled) {
-      rainNodes.master.gain.linearRampToValueAtTime(0, audioContext.currentTime + 0.4);
-      rainNodes.enabled = false;
-      rainToggleEl.textContent = "Ativar chuva";
-      audioStatusEl.textContent = "Áudio desligado.";
+      await withDelay(rainToggleEl, () => fadeRainOut());
       return;
     }
-    const volume = Number(rainVolumeEl.value) / 100;
-    rainNodes.master.gain.linearRampToValueAtTime(volume * 0.38, audioContext.currentTime + 0.4);
-    rainNodes.enabled = true;
-    rainToggleEl.textContent = "Pausar chuva";
-    audioStatusEl.textContent = "Chuva ambiente ativa.";
+    await withDelay(rainToggleEl, () => fadeRainIn(getRainTargetGain()));
   });
 
   rainVolumeEl.addEventListener("input", () => {
     if (!rainNodes || !audioContext) {
       return;
     }
-    const volume = Number(rainVolumeEl.value) / 100;
     if (rainNodes.enabled) {
-      rainNodes.master.gain.linearRampToValueAtTime(volume * 0.38, audioContext.currentTime + 0.2);
+      rainNodes.master.gain.linearRampToValueAtTime(getRainTargetGain(), audioContext.currentTime + 0.2);
     }
+  });
+
+  autoRainEl.addEventListener("change", () => {
+    window.localStorage.setItem(AUTO_RAIN_KEY, String(autoRainEl.checked));
   });
 }
 
@@ -416,6 +436,7 @@ async function refreshData() {
   state.currentProfile = normalizeProfile(profileResult.data, state.currentUser.email || "");
   state.posts = Array.isArray(postsResult.data) ? postsResult.data : [];
   state.votes = Object.fromEntries((votesResult.data || []).map((vote) => [vote.post_id, vote.value]));
+  updateAtmosphericSignals();
   syncAuthView();
 }
 
@@ -435,12 +456,14 @@ function syncAuthView() {
   textColorInputEl.value = normalizeColor(state.currentProfile.text_color);
   profilePreviewAvatarEl.src = state.currentProfile.avatar_url || DEFAULT_AVATAR;
   sessionAvatarEl.src = state.currentProfile.avatar_url || DEFAULT_AVATAR;
-  sessionIndicatorEl.textContent = `Logado como u/${state.currentProfile.display_name}`;
+  sessionIndicatorEl.textContent = `Presença reconhecida: u/${state.currentProfile.display_name}`;
   sessionIndicatorEl.style.color = state.currentProfile.text_color;
   profileNameEl.textContent = `u/${state.currentProfile.display_name}`;
   profileNameEl.style.color = state.currentProfile.text_color;
   profileEmailEl.textContent = state.currentUser.email || "";
   profilePostCountEl.textContent = String(state.posts.filter((post) => post.user_id === state.currentUser.id).length);
+  updateAtmosphericSignals();
+  maybeAutostartRain();
   renderPosts();
 }
 
@@ -464,9 +487,11 @@ function renderGroupControls() {
     button.dataset.group = group.id;
     button.innerHTML = `<strong>c/${group.nome}</strong><small>${group.descricao}</small>`;
     button.addEventListener("click", () => {
-      state.selectedGroup = group.id;
-      syncActiveGroup();
-      renderPosts();
+      withDelay(button, () => {
+        state.selectedGroup = group.id;
+        syncActiveGroup();
+        renderPosts();
+      });
     });
     groupListEl.appendChild(button);
   });
@@ -475,11 +500,13 @@ function renderGroupControls() {
   allButton.type = "button";
   allButton.className = "group-button is-active";
   allButton.dataset.group = "todos";
-  allButton.innerHTML = "<strong>c/Todos</strong><small>Mostra publicações de todos os grupos.</small>";
+  allButton.innerHTML = "<strong>c/Todos</strong><small>Mostra registros de todos os círculos.</small>";
   allButton.addEventListener("click", () => {
-    state.selectedGroup = "todos";
-    syncActiveGroup();
-    renderPosts();
+    withDelay(allButton, () => {
+      state.selectedGroup = "todos";
+      syncActiveGroup();
+      renderPosts();
+    });
   });
   groupListEl.prepend(allButton);
 }
@@ -494,15 +521,15 @@ function syncActiveGroup() {
 function renderPosts() {
   const visiblePosts = getVisiblePosts();
   const currentGroup = GROUPS.find((group) => group.id === state.selectedGroup);
-  feedTitleEl.textContent = state.selectedGroup === "todos" ? "Todos os relatos" : `c/${currentGroup?.nome || "Grupo"}`;
+  feedTitleEl.textContent = state.selectedGroup === "todos" ? "Todos os registros" : `c/${currentGroup?.nome || "Círculo"}`;
 
   postFeedEl.innerHTML = "";
   if (!visiblePosts.length) {
     const emptyState = document.createElement("article");
     emptyState.className = "empty-state";
     emptyState.innerHTML = `
-      <h4>Nenhum relato encontrado</h4>
-      <p>Troque o grupo, ajuste o filtro ou publique a primeira história desse espaço.</p>
+      <h4>Nenhum registro detectado</h4>
+      <p>Troque o círculo, ajuste o filtro ou anexe a primeira entrada deste arquivo.</p>
     `;
     postFeedEl.appendChild(emptyState);
     return;
@@ -514,11 +541,11 @@ function renderPosts() {
     const voteState = state.votes[post.id] || 0;
 
     node.querySelector(".vote-score").textContent = post.votes_count;
-    node.querySelector(".post-group").textContent = `c/${group?.nome || "Grupo"}`;
+    node.querySelector(".post-group").textContent = `c/${group?.nome || "Círculo"}`;
     node.querySelector(".post-author").textContent = `por u/${post.author_display}`;
     node.querySelector(".post-author").style.color = post.author_text_color || "#f5eef8";
     node.querySelector(".post-date").textContent = formatDate(post.created_at);
-    node.querySelector(".post-owner").textContent = `ID do autor: ${post.author_username}`;
+    node.querySelector(".post-owner").textContent = `rastro do autor: ${post.author_username}`;
     node.querySelector(".post-title").textContent = post.title;
     node.querySelector(".post-text").textContent = post.content;
     node.querySelector(".post-avatar").src = post.author_avatar_url || DEFAULT_AVATAR;
@@ -588,6 +615,146 @@ function getVisiblePosts() {
   }
 
   return posts;
+}
+
+function updateAtmosphericSignals() {
+  const previousVisit = Number(window.localStorage.getItem(LAST_VISIT_KEY) || 0);
+  const newReports = state.posts.filter((post) => new Date(post.created_at).getTime() > previousVisit).length;
+  const activeUnknown = 4 + Math.min(19, state.posts.length + Math.floor(Math.random() * 4));
+  const latestPost = state.posts[0];
+
+  unknownUsersCountEl.textContent = String(activeUnknown);
+  newReportsCountEl.textContent = String(newReports);
+  if (latestPost) {
+    lastActivityEl.textContent = `Última atividade detectada: ${formatDate(latestPost.created_at)} em c/${GROUPS.find((group) => group.id === latestPost.group_id)?.nome || "Círculo"}.`;
+  } else {
+    lastActivityEl.textContent = "Última atividade detectada: nenhum rastro confirmado.";
+  }
+
+  window.localStorage.setItem(LAST_VISIT_KEY, String(Date.now()));
+}
+
+function rotateSystemWhisper() {
+  systemWhisperEl.textContent = SYSTEM_WHISPERS[Math.floor(Math.random() * SYSTEM_WHISPERS.length)];
+}
+
+function hydrateAmbientState() {
+  autoRainEl.checked = window.localStorage.getItem(AUTO_RAIN_KEY) === "true";
+}
+
+async function maybeAutostartRain() {
+  if (!autoRainEl.checked || rainNodes?.enabled || !state.currentUser) {
+    return;
+  }
+  try {
+    if (!audioContext) {
+      setupRainAudio();
+    }
+    if (!audioContext || !rainNodes) {
+      return;
+    }
+    if (audioContext.state === "suspended") {
+      await audioContext.resume();
+    }
+    fadeRainIn(Math.min(0.06, getRainTargetGain()));
+  } catch (_error) {
+    audioStatusEl.textContent = "A escuta automática foi bloqueada pelo navegador.";
+  }
+}
+
+function getRainTargetGain() {
+  return (Number(rainVolumeEl.value) / 100) * 0.38;
+}
+
+function fadeRainIn(targetGain) {
+  if (!audioContext || !rainNodes) {
+    return;
+  }
+  rainNodes.master.gain.cancelScheduledValues(audioContext.currentTime);
+  rainNodes.master.gain.linearRampToValueAtTime(targetGain, audioContext.currentTime + 1.6);
+  rainNodes.enabled = true;
+  rainToggleEl.textContent = "Silenciar escuta";
+  audioStatusEl.textContent = "Chuva baixa em execução. Escute com cautela.";
+  scheduleThunder();
+}
+
+function fadeRainOut() {
+  if (!audioContext || !rainNodes) {
+    return;
+  }
+  rainNodes.master.gain.cancelScheduledValues(audioContext.currentTime);
+  rainNodes.master.gain.linearRampToValueAtTime(0, audioContext.currentTime + 1.2);
+  rainNodes.enabled = false;
+  rainToggleEl.textContent = "Iniciar escuta";
+  audioStatusEl.textContent = "Escuta inativa.";
+  if (thunderTimer) {
+    window.clearTimeout(thunderTimer);
+    thunderTimer = null;
+  }
+}
+
+function scheduleThunder() {
+  if (!rainNodes?.enabled) {
+    return;
+  }
+  const nextDelay = 14000 + Math.random() * 26000;
+  thunderTimer = window.setTimeout(() => {
+    triggerThunder();
+    scheduleThunder();
+  }, nextDelay);
+}
+
+function triggerThunder() {
+  if (!audioContext || !rainNodes?.enabled) {
+    return;
+  }
+
+  const duration = 3.8;
+  const buffer = audioContext.createBuffer(1, audioContext.sampleRate * duration, audioContext.sampleRate);
+  const channel = buffer.getChannelData(0);
+  for (let index = 0; index < channel.length; index += 1) {
+    const falloff = 1 - index / channel.length;
+    channel[index] = (Math.random() * 2 - 1) * Math.pow(falloff, 1.8);
+  }
+
+  const source = audioContext.createBufferSource();
+  source.buffer = buffer;
+
+  const lowpass = audioContext.createBiquadFilter();
+  lowpass.type = "lowpass";
+  lowpass.frequency.value = 220;
+
+  const gain = audioContext.createGain();
+  gain.gain.value = 0.0001;
+
+  source.connect(lowpass);
+  lowpass.connect(gain);
+  gain.connect(audioContext.destination);
+
+  const start = audioContext.currentTime;
+  gain.gain.exponentialRampToValueAtTime(0.028, start + 0.8);
+  gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+  source.start(start);
+  source.stop(start + duration);
+
+  audioStatusEl.textContent = "Algo distante respondeu na chuva.";
+  window.setTimeout(() => {
+    if (rainNodes?.enabled) {
+      audioStatusEl.textContent = "Chuva baixa em execução. Escute com cautela.";
+    }
+  }, 4200);
+}
+
+function withDelay(element, callback) {
+  const wait = 50 + Math.floor(Math.random() * 101);
+  element.classList.add("is-delaying");
+  return new Promise((resolve) => {
+    window.setTimeout(async () => {
+      element.classList.remove("is-delaying");
+      const result = await callback();
+      resolve(result);
+    }, wait);
+  });
 }
 
 function normalizeProfile(profile, email) {

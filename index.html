@@ -23,7 +23,7 @@
       <p class="auth-panel__eyebrow">Acesso restrito</p>
       <h1 class="auth-panel__title">Acreta</h1>
       <p class="auth-panel__text">
-        Cadastre-se para entrar no fórum e guardar seus contos em um perfil real do Supabase.
+        Você não deveria ter encontrado isto. Entre para ler os registros que continuam surgindo.
       </p>
       <p id="setup-warning" class="setup-warning is-hidden"></p>
 
@@ -75,7 +75,7 @@
         <div class="brand">
           <span class="brand__mark">A</span>
           <div>
-            <p class="brand__eyebrow">Comunidade de histórias sombrias</p>
+            <p class="brand__eyebrow">Arquivo restrito de relatos anômalos</p>
             <h1 class="brand__title">Acreta</h1>
           </div>
         </div>
@@ -90,49 +90,65 @@
 
       <section class="hero__content">
         <div class="hero__copy">
-          <p class="hero__tag">Contos obscuros, ruído de chuva e fundo vivo</p>
-          <h2>Publique terror, ficção sombria e paranoia psicológica em grupos próprios.</h2>
+          <p class="hero__tag glitch-text" data-text="Leitura por sua conta">Leitura por sua conta</p>
+          <h2>Alguns relatos nunca deveriam ter sido escritos.</h2>
           <p class="hero__text">
-            O Acreta agora pode usar autenticação e dados reais no Supabase, mantendo o clima pesado,
-            o feed compartilhado e o perfil persistido entre usuários.
+            O Acreta registra ecos, confissões e fragmentos deixados por quem afirma ter visto algo errado.
+            Entre, leia pouco e saia cedo.
           </p>
           <div class="hero__stats">
             <article>
               <strong>10</strong>
-              <span>grupos de exemplo</span>
+              <span>círculos abertos</span>
             </article>
             <article>
-              <strong>Online</strong>
-              <span>postagens compartilhadas</span>
+              <strong id="unknown-users-count">7</strong>
+              <span>presenças sem identificação</span>
             </article>
             <article>
-              <strong>Perfil</strong>
-              <span>ligado ao autor</span>
+              <strong id="new-reports-count">0</strong>
+              <span>novos registros desde sua última visita</span>
             </article>
+          </div>
+          <div class="hero__signals">
+            <p id="last-activity" class="signal-pill">Última atividade detectada: aguardando leitura...</p>
+            <p id="system-whisper" class="signal-pill">Os relatórios estão começando a aparecer.</p>
           </div>
         </div>
 
         <aside class="hero__panel">
-          <p class="panel__label">Ambiente ritual</p>
+          <p class="panel__label">Relato em destaque</p>
+          <article class="featured-report">
+            <p class="featured-report__eyebrow">Registro recente // círculo da chuva</p>
+            <h3>“Ainda ouço a chuva quando tudo já ficou em silêncio.”</h3>
+            <p>
+              O corredor secou às 03:14, mas as pegadas continuaram surgindo na madeira. Nenhuma ia para
+              fora do quarto. Todas vinham em minha direção.
+            </p>
+          </article>
           <ul class="spotlight-list">
-            <li>Fundo animado com chuva, névoa e pulsos vermelhos discretos.</li>
-            <li>Grupos separados por subgênero para não misturar o clima dos relatos.</li>
-            <li>Player para ativar ou pausar uma ambientação de chuva no navegador.</li>
+            <li>Círculos separados para não contaminar arquivos com atmosferas incompatíveis.</li>
+            <li>Registros recentes sobem primeiro, mas os mais longos parecem permanecer.</li>
+            <li>Certos nomes continuam aparecendo mesmo quando ninguém assume ter escrito.</li>
           </ul>
 
           <div class="audio-panel">
             <div>
-              <p class="audio-panel__title">Som ambiente</p>
-              <p class="audio-panel__text">Ative chuva contínua para ler ou escrever no escuro.</p>
+              <p class="audio-panel__title">Escuta de fundo</p>
+              <p class="audio-panel__text">Mantenha a chuva baixa. Os ruídos distantes costumam vir depois.</p>
             </div>
             <div class="audio-panel__controls">
-              <button id="rain-toggle" class="button button--secondary" type="button">Ativar chuva</button>
+              <button id="rain-toggle" class="button button--secondary" type="button">Iniciar escuta</button>
+              <label class="audio-toggle" for="auto-rain">
+                <input id="auto-rain" type="checkbox">
+                <span>Iniciar automaticamente em volume baixo</span>
+              </label>
               <label class="volume-wrap" for="rain-volume">
                 <span>Volume</span>
-                <input id="rain-volume" type="range" min="0" max="100" value="35">
+                <input id="rain-volume" type="range" min="0" max="100" value="18">
               </label>
             </div>
-            <p id="audio-status" class="audio-panel__status" aria-live="polite">Áudio desligado.</p>
+            <p id="audio-status" class="audio-panel__status" aria-live="polite">Escuta inativa.</p>
           </div>
         </aside>
       </section>
@@ -142,8 +158,8 @@
       <aside class="sidebar">
         <section class="card card--profile">
           <div class="card__header">
-            <h3>Perfil</h3>
-            <span>autor atual</span>
+            <h3>Identidade</h3>
+            <span>presença atual</span>
           </div>
           <div class="profile-box">
             <div class="profile-box__head">
@@ -156,7 +172,7 @@
             <div class="profile-box__stats">
               <article>
                 <strong id="profile-post-count">0</strong>
-                <span>contos</span>
+                <span>registros</span>
               </article>
             </div>
           </div>
@@ -164,8 +180,8 @@
 
         <section class="card card--profile-edit">
           <div class="card__header">
-            <h3>Editar perfil</h3>
-            <span>identidade</span>
+            <h3>Ajustar identidade</h3>
+            <span>rastro visual</span>
           </div>
           <form id="profile-form" class="profile-form">
             <label>
@@ -190,20 +206,20 @@
 
         <section class="card card--groups">
           <div class="card__header">
-            <h3>Grupos</h3>
-            <span>10 exemplos</span>
+            <h3>Círculos</h3>
+            <span>10 arquivos abertos</span>
           </div>
           <div id="group-list" class="group-list"></div>
         </section>
 
         <section class="card card--about">
           <div class="card__header">
-            <h3>Como funciona</h3>
+            <h3>Protocolo</h3>
           </div>
           <ul class="about-list">
-            <li>O Acreta funciona apenas como um fórum para escrever e compartilhar histórias e contos.</li>
-            <li>Somente usuários cadastrados podem acessar e publicar no site.</li>
-            <li>Os contos ficam salvos no perfil do autor que os publicou.</li>
+            <li>O Acreta não opera como vitrine; ele arquiva registros e fragmentos.</li>
+            <li>Somente presenças cadastradas podem entrar, ler e anexar novos relatórios.</li>
+            <li>Cada entrada permanece ligada ao rastro do autor que a deixou.</li>
           </ul>
         </section>
       </aside>
@@ -211,8 +227,8 @@
       <section class="content">
         <section class="card composer">
           <div class="card__header">
-            <h3>Criar novo relato</h3>
-            <span>Publicação rápida</span>
+            <h3>Anexar novo registro</h3>
+            <span>inserção controlada</span>
           </div>
 
           <form id="post-form" class="composer__form">
@@ -223,7 +239,7 @@
 
             <div class="composer__row">
               <label>
-                <span>Grupo</span>
+                <span>Círculo</span>
                 <select id="group" name="group" required></select>
               </label>
 
@@ -240,27 +256,27 @@
 
             <label>
               <span>Texto</span>
-              <textarea id="content" name="content" rows="18" placeholder="Escreva seu relato em português BR..." required></textarea>
+              <textarea id="content" name="content" rows="18" placeholder="Registre o que viu antes que isso desapareça..." required></textarea>
             </label>
 
             <div class="composer__actions">
               <p id="form-feedback" class="composer__feedback" aria-live="polite"></p>
-              <button class="button button--primary" type="submit">Publicar na escuridão</button>
+              <button class="button button--primary" type="submit">Arquivar registro</button>
             </div>
           </form>
         </section>
 
         <section class="feed-header">
           <div>
-            <p class="feed-header__eyebrow">Feed principal</p>
-            <h3 id="feed-title">Todos os relatos</h3>
+            <p class="feed-header__eyebrow">Arquivo principal</p>
+            <h3 id="feed-title">Todos os registros</h3>
           </div>
 
           <div class="feed-filter">
-            <button class="filter-chip is-active" type="button" data-filter="all">Todos</button>
-            <button class="filter-chip" type="button" data-filter="recent">Recentes</button>
-            <button class="filter-chip" type="button" data-filter="long">Longos</button>
-            <button class="filter-chip" type="button" data-filter="mine">Meus contos</button>
+            <button class="filter-chip is-active" type="button" data-filter="all">Arquivo completo</button>
+            <button class="filter-chip" type="button" data-filter="recent">Sinais recentes</button>
+            <button class="filter-chip" type="button" data-filter="long">Registros longos</button>
+            <button class="filter-chip" type="button" data-filter="mine">Meu rastro</button>
           </div>
         </section>
 

@@ -26,12 +26,38 @@ body {
   margin: 0;
   min-height: 100vh;
   overflow-x: hidden;
-  font-family: "Segoe UI", "Trebuchet MS", sans-serif;
+  font-family: "IBM Plex Sans", "Trebuchet MS", sans-serif;
   color: var(--text);
   background:
     radial-gradient(circle at 15% 10%, rgba(83, 33, 143, 0.22), transparent 30%),
     radial-gradient(circle at 85% 8%, rgba(142, 16, 28, 0.22), transparent 28%),
     linear-gradient(180deg, #050507 0%, #020203 42%, #040206 100%);
+}
+
+body::before,
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+
+body::before {
+  opacity: 0.08;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+  background-size: 3px 3px, 4px 4px;
+  mix-blend-mode: soft-light;
+}
+
+body::after {
+  background:
+    radial-gradient(circle at 50% 15%, rgba(221, 27, 52, 0.1), transparent 28%),
+    radial-gradient(circle at 50% 85%, rgba(83, 33, 143, 0.08), transparent 32%);
+  opacity: 0.45;
+  animation: bodyPulse 14s ease-in-out infinite;
 }
 
 button,
@@ -186,6 +212,23 @@ button {
   line-height: 1.7;
 }
 
+.glitch-text {
+  position: relative;
+  display: inline-block;
+  animation: textFlicker 8s steps(1) infinite;
+}
+
+.glitch-text::after {
+  content: attr(data-text);
+  position: absolute;
+  inset: 0;
+  color: rgba(221, 27, 52, 0.45);
+  transform: translate(1px, 0);
+  opacity: 0;
+  pointer-events: none;
+  animation: glitchGhost 10s steps(1) infinite;
+}
+
 .auth-switch {
   display: flex;
   gap: 10px;
@@ -333,7 +376,7 @@ button {
 .filter-chip,
 .vote-button {
   border: 0;
-  transition: transform 180ms ease, background 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+  transition: transform 180ms ease, background 180ms ease, box-shadow 180ms ease, border-color 180ms ease, opacity 180ms ease;
 }
 
 .topbar__action {
@@ -348,6 +391,15 @@ button {
 .filter-chip:hover,
 .vote-button:hover {
   transform: translateY(-1px);
+  box-shadow: 0 0 22px rgba(221, 27, 52, 0.12);
+}
+
+.button.is-delaying,
+.filter-chip.is-delaying,
+.group-button.is-delaying,
+.vote-button.is-delaying {
+  opacity: 0.82;
+  transform: translateY(1px) scale(0.995);
 }
 
 .hero__content {
@@ -368,6 +420,22 @@ button {
   margin: 18px 0 0;
   color: #d4cfde;
   line-height: 1.7;
+}
+
+.hero__signals {
+  display: grid;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.signal-pill {
+  margin: 0;
+  padding: 11px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  color: #d8d2df;
+  background: rgba(255, 255, 255, 0.03);
+  box-shadow: inset 0 0 30px rgba(221, 27, 52, 0.035);
 }
 
 .hero__stats {
@@ -405,6 +473,38 @@ button {
   padding: 22px;
 }
 
+.featured-report {
+  margin-top: 10px;
+  padding: 16px 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.015)),
+    radial-gradient(circle at top right, rgba(221, 27, 52, 0.08), transparent 35%);
+  box-shadow: inset 0 0 34px rgba(83, 33, 143, 0.05);
+}
+
+.featured-report__eyebrow {
+  margin: 0;
+  color: #ff98a5;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 0.72rem;
+}
+
+.featured-report h3 {
+  margin: 10px 0 0;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1.3rem;
+  line-height: 1.25;
+}
+
+.featured-report p:last-child {
+  margin: 12px 0 0;
+  color: #d4cfde;
+  line-height: 1.7;
+}
+
 .spotlight-list,
 .about-list {
   margin: 16px 0 0;
@@ -436,6 +536,19 @@ button {
   display: grid;
   gap: 14px;
   margin-top: 14px;
+}
+
+.audio-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #d6d0dd;
+  font-size: 0.92rem;
+}
+
+.audio-toggle input {
+  width: 16px;
+  height: 16px;
 }
 
 .button--secondary {
@@ -482,6 +595,17 @@ button {
   border-radius: 24px;
   background: var(--panel);
   box-shadow: var(--shadow);
+  position: relative;
+  overflow: hidden;
+}
+
+.card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(135deg, transparent, rgba(221, 27, 52, 0.025), transparent 70%);
+  opacity: 0.45;
 }
 
 .card__header {
@@ -561,12 +685,18 @@ button {
   border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 18px;
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.02));
+  transition: transform 220ms ease, border-color 220ms ease, box-shadow 220ms ease, background 220ms ease;
 }
 
 .group-button.is-active {
   border-color: rgba(159, 92, 247, 0.45);
   background: linear-gradient(135deg, rgba(83, 33, 143, 0.5), rgba(142, 16, 28, 0.25));
   box-shadow: inset 0 0 28px rgba(221, 27, 52, 0.08);
+}
+
+.group-button:hover {
+  transform: translateX(2px);
+  border-color: rgba(221, 27, 52, 0.22);
 }
 
 .group-button small,
@@ -679,6 +809,11 @@ textarea {
   background: var(--panel-strong);
   box-shadow: var(--shadow);
   overflow: hidden;
+}
+
+.post-card:hover {
+  border-color: rgba(221, 27, 52, 0.18);
+  box-shadow: 0 28px 90px rgba(0, 0, 0, 0.68);
 }
 
 .vote-rail {
@@ -813,6 +948,39 @@ textarea {
   }
   50% {
     opacity: 0.8;
+  }
+}
+
+@keyframes bodyPulse {
+  0%, 100% {
+    opacity: 0.28;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+@keyframes textFlicker {
+  0%, 94%, 100% {
+    opacity: 1;
+  }
+  95% {
+    opacity: 0.65;
+  }
+  96% {
+    opacity: 0.96;
+  }
+}
+
+@keyframes glitchGhost {
+  0%, 88%, 100% {
+    opacity: 0;
+  }
+  89% {
+    opacity: 0.28;
+  }
+  90% {
+    opacity: 0;
   }
 }
 
