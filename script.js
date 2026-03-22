@@ -37,7 +37,8 @@ const state = {
   currentProfile: null,
   votes: {},
   savedPosts: new Set(),
-  comments: {}
+  comments: {},
+  commentsBackendReady: true
 };
 
 const supabaseUrl = window.ACRETA_SUPABASE_URL || "";
@@ -46,6 +47,8 @@ const isSupabaseConfigured =
   Boolean(supabaseUrl && supabaseAnonKey) &&
   !supabaseUrl.includes("COLE_AQUI") &&
   !supabaseAnonKey.includes("COLE_AQUI");
+const MEDIA_BUCKET = "acreta-media";
+const AVATAR_BUCKET = "acreta-avatars";
 
 const supabaseClient = isSupabaseConfigured
   ? window.supabase.createClient(supabaseUrl, supabaseAnonKey)
@@ -253,6 +256,10 @@ function bindAuthEvents() {
 
     const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
     if (error) {
+      await removeStorageFile(imageUrl, MEDIA_BUCKET);
+      await removeStorageFile(videoUrl, MEDIA_BUCKET);
+      await removeStorageFile(imageUrl, MEDIA_BUCKET);
+      await removeStorageFile(videoUrl, MEDIA_BUCKET);
       authFeedbackEl.textContent = error.message;
       return;
     }
@@ -419,8 +426,16 @@ function bindAppEvents() {
     }
 
     feedbackEl.textContent = "Arquivando ocorrência...";
-    const imageUrl = imageFile ? await readFileAsDataUrl(imageFile) : "";
-    const videoUrl = videoFile ? await readFileAsDataUrl(videoFile) : "";
+    let imageUrl = "";
+    let videoUrl = "";
+
+    try {
+      imageUrl = imageFile ? await uploadFileToStorage(imageFile, MEDIA_BUCKET, state.currentUser.id, "posts") : "";
+      videoUrl = videoFile ? await uploadFileToStorage(videoFile, MEDIA_BUCKET, state.currentUser.id, "posts") : "";
+    } catch (error) {
+      feedbackEl.textContent = error instanceof Error ? error.message : "Falha ao enviar anexos para o Storage.";
+      return;
+    }
 
     const payload = {
       user_id: state.currentUser.id,
@@ -471,8 +486,13 @@ function bindAppEvents() {
     const file = avatarFileInputEl.files?.[0];
 
     let avatarUrl = state.currentProfile.avatar_url || "";
-    if (file) {
-      avatarUrl = await readFileAsDataUrl(file);
+    try {
+      if (file) {
+        avatarUrl = await uploadFileToStorage(file, AVATAR_BUCKET, state.currentUser.id, "avatar");
+      }
+    } catch (error) {
+      profileFeedbackEl.textContent = error instanceof Error ? error.message : "Falha ao enviar avatar para o Storage.";
+      return;
     }
 
     const updates = {
@@ -505,6 +525,10 @@ function bindAppEvents() {
       return;
     }
 
+    if (file && state.currentProfile.avatar_url && state.currentProfile.avatar_url !== avatarUrl) {
+      await removeStorageFile(state.currentProfile.avatar_url, AVATAR_BUCKET);
+    }
+
     avatarFileInputEl.value = "";
     profileFeedbackEl.textContent = "Identidade recalibrada.";
     await refreshData();
@@ -514,6 +538,8 @@ function bindAppEvents() {
     if (!supabaseClient || !state.currentUser) {
       return;
     }
+
+    await removeStorageFile(state.currentProfile?.avatar_url || "", AVATAR_BUCKET);
 
     const { error: profileError } = await supabaseClient
       .from("profiles")
@@ -614,10 +640,11 @@ async function refreshData() {
     return;
   }
 
-  const [profileResult, postsResult, votesResult] = await Promise.all([
+  const [profileResult, postsResult, votesResult, commentsResult] = await Promise.all([
     supabaseClient.from("profiles").select("*").eq("id", state.currentUser.id).single(),
     supabaseClient.from("posts").select("*").order("created_at", { ascending: false }),
-    supabaseClient.from("post_votes").select("post_id, value").eq("user_id", state.currentUser.id)
+    supabaseClient.from("post_votes").select("post_id, value").eq("user_id", state.currentUser.id),
+    supabaseClient.from("post_comments").select("*").order("created_at", { ascending: true })
   ]);
 
   if (profileResult.error) {
@@ -638,6 +665,13 @@ async function refreshData() {
   state.currentProfile = normalizeProfile(profileResult.data, state.currentUser.email || "");
   state.posts = Array.isArray(postsResult.data) ? postsResult.data : [];
   state.votes = Object.fromEntries((votesResult.data || []).map((vote) => [vote.post_id, vote.value]));
+  if (commentsResult.error) {
+    state.commentsBackendReady = false;
+    state.comments = normalizeLegacyCommentState(JSON.parse(window.localStorage.getItem(COMMENTS_KEY) || "{}"));
+  } else {
+    state.commentsBackendReady = true;
+    state.comments = groupCommentsByPost(commentsResult.data || []);
+  }
   updateAtmosphericSignals();
   syncAuthView();
 }
@@ -1355,7 +1389,7 @@ function renderComments(postId) {
   });
 }
 
-function saveComment() {
+async function saveComment() {
   if (!activePostId || !state.currentUser || !state.currentProfile) {
     return;
   }
@@ -1364,18 +1398,73 @@ function saveComment() {
     commentFeedbackEl.textContent = "Escreva algo antes de salvar o comentário.";
     return;
   }
-  const entry = {
-    id: crypto.randomUUID(),
-    authorId: state.currentUser.id,
-    authorDisplay: state.currentProfile.display_name,
-    content,
-    createdAt: new Date().toISOString()
+  if (!state.commentsBackendReady) {
+    commentFeedbackEl.textContent = "O banco ainda nao recebeu a tabela de comentarios. Rode o SQL atualizado do Supabase.";
+    return;
+  }
+  const payload = {
+    post_id: activePostId,
+    user_id: state.currentUser.id,
+    author_display: state.currentProfile.display_name,
+    author_username: state.currentProfile.username,
+    author_text_color: state.currentProfile.text_color,
+    author_avatar_url: state.currentProfile.avatar_url || "",
+    content
   };
+  const { data, error } = await supabaseClient
+    .from("post_comments")
+    .insert(payload)
+    .select("*")
+    .single();
+  if (error) {
+    commentFeedbackEl.textContent = error.message.includes("post_comments")
+      ? "O banco ainda nao recebeu a tabela de comentarios. Rode o SQL atualizado do Supabase."
+      : error.message;
+    return;
+  }
+  const entry = mapCommentRecord(data);
   state.comments[activePostId] = [...(state.comments[activePostId] || []), entry];
-  window.localStorage.setItem(COMMENTS_KEY, JSON.stringify(state.comments));
   commentInputEl.value = "";
   commentFeedbackEl.textContent = "Comentário salvo sob o registro.";
   renderComments(activePostId);
+}
+
+function groupCommentsByPost(comments) {
+  return comments.reduce((grouped, comment) => {
+    const mappedComment = mapCommentRecord(comment);
+    if (!grouped[mappedComment.postId]) {
+      grouped[mappedComment.postId] = [];
+    }
+    grouped[mappedComment.postId].push(mappedComment);
+    return grouped;
+  }, {});
+}
+
+function mapCommentRecord(comment) {
+  return {
+    id: comment.id,
+    postId: comment.post_id,
+    authorId: comment.user_id,
+    authorDisplay: comment.author_display,
+    content: comment.content,
+    createdAt: comment.created_at
+  };
+}
+
+function normalizeLegacyCommentState(commentsByPost) {
+  return Object.fromEntries(
+    Object.entries(commentsByPost).map(([postId, comments]) => [
+      postId,
+      (comments || []).map((comment) => ({
+        id: comment.id,
+        postId,
+        authorId: comment.authorId || comment.user_id || "",
+        authorDisplay: comment.authorDisplay || comment.author_display || "Anônimo",
+        content: comment.content || "",
+        createdAt: comment.createdAt || comment.created_at || new Date().toISOString()
+      }))
+    ])
+  );
 }
 
 function renderRelatedPosts(post) {
@@ -1534,6 +1623,54 @@ function normalizeProfile(profile, email) {
     avatar_url: profile.avatar_url || DEFAULT_AVATAR,
     email
   };
+}
+
+async function uploadFileToStorage(file, bucket, userId, folder) {
+  if (!supabaseClient) {
+    throw new Error("Supabase indisponivel para upload.");
+  }
+  const extension = getFileExtension(file.name);
+  const path = `${userId}/${folder}/${crypto.randomUUID()}${extension ? `.${extension}` : ""}`;
+  const { error } = await supabaseClient.storage
+    .from(bucket)
+    .upload(path, file, { upsert: false, contentType: file.type || undefined });
+  if (error) {
+    throw new Error(mapStorageError(error));
+  }
+  const { data } = supabaseClient.storage.from(bucket).getPublicUrl(path);
+  return data.publicUrl;
+}
+
+async function removeStorageFile(publicUrl, bucket) {
+  if (!supabaseClient || !publicUrl || publicUrl.startsWith("data:")) {
+    return;
+  }
+  const marker = `/storage/v1/object/public/${bucket}/`;
+  const index = publicUrl.indexOf(marker);
+  if (index === -1) {
+    return;
+  }
+  const path = decodeURIComponent(publicUrl.slice(index + marker.length));
+  if (!path) {
+    return;
+  }
+  await supabaseClient.storage.from(bucket).remove([path]);
+}
+
+function getFileExtension(filename) {
+  const parts = String(filename || "").split(".");
+  return parts.length > 1 ? parts.pop().toLowerCase() : "";
+}
+
+function mapStorageError(error) {
+  const message = String(error?.message || "");
+  if (message.includes("Bucket not found")) {
+    return "O bucket do Storage ainda nao existe. Rode o SQL atualizado do Supabase.";
+  }
+  if (message.includes("row-level security") || message.includes("permission")) {
+    return "As politicas do Storage ainda nao estao liberando upload. Rode o SQL atualizado do Supabase.";
+  }
+  return message || "Falha ao enviar arquivo para o Storage.";
 }
 
 function normalizeUsername(value) {

@@ -40,6 +40,26 @@ create table if not exists public.post_votes (
   primary key (post_id, user_id)
 );
 
+create table if not exists public.post_comments (
+  id uuid primary key default gen_random_uuid(),
+  post_id uuid not null references public.posts(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  author_display text not null,
+  author_username text not null,
+  author_text_color text not null default '#f5eef8',
+  author_avatar_url text not null default '',
+  content text not null,
+  created_at timestamptz not null default now()
+);
+
+insert into storage.buckets (id, name, public)
+values ('acreta-media', 'acreta-media', true)
+on conflict (id) do update set public = excluded.public;
+
+insert into storage.buckets (id, name, public)
+values ('acreta-avatars', 'acreta-avatars', true)
+on conflict (id) do update set public = excluded.public;
+
 create or replace function public.set_updated_at()
 returns trigger
 language plpgsql
@@ -108,6 +128,7 @@ execute function public.apply_post_vote_delta();
 alter table public.profiles enable row level security;
 alter table public.posts enable row level security;
 alter table public.post_votes enable row level security;
+alter table public.post_comments enable row level security;
 
 drop policy if exists "profiles are readable" on public.profiles;
 create policy "profiles are readable"
@@ -174,6 +195,117 @@ on public.post_votes
 for delete
 to authenticated
 using (auth.uid() = user_id);
+
+drop policy if exists "comments are readable" on public.post_comments;
+create policy "comments are readable"
+on public.post_comments
+for select
+to anon, authenticated
+using (true);
+
+drop policy if exists "users create own comments" on public.post_comments;
+create policy "users create own comments"
+on public.post_comments
+for insert
+to authenticated
+with check (auth.uid() = user_id);
+
+drop policy if exists "users update own comments" on public.post_comments;
+create policy "users update own comments"
+on public.post_comments
+for update
+to authenticated
+using (auth.uid() = user_id)
+with check (auth.uid() = user_id);
+
+drop policy if exists "users delete own comments" on public.post_comments;
+create policy "users delete own comments"
+on public.post_comments
+for delete
+to authenticated
+using (auth.uid() = user_id);
+
+drop policy if exists "public read acreta media" on storage.objects;
+create policy "public read acreta media"
+on storage.objects
+for select
+to anon, authenticated
+using (bucket_id = 'acreta-media');
+
+drop policy if exists "public read acreta avatars" on storage.objects;
+create policy "public read acreta avatars"
+on storage.objects
+for select
+to anon, authenticated
+using (bucket_id = 'acreta-avatars');
+
+drop policy if exists "users upload acreta media" on storage.objects;
+create policy "users upload acreta media"
+on storage.objects
+for insert
+to authenticated
+with check (
+  bucket_id = 'acreta-media'
+  and auth.uid()::text = (storage.foldername(name))[1]
+);
+
+drop policy if exists "users upload acreta avatars" on storage.objects;
+create policy "users upload acreta avatars"
+on storage.objects
+for insert
+to authenticated
+with check (
+  bucket_id = 'acreta-avatars'
+  and auth.uid()::text = (storage.foldername(name))[1]
+);
+
+drop policy if exists "users update acreta media" on storage.objects;
+create policy "users update acreta media"
+on storage.objects
+for update
+to authenticated
+using (
+  bucket_id = 'acreta-media'
+  and auth.uid()::text = (storage.foldername(name))[1]
+)
+with check (
+  bucket_id = 'acreta-media'
+  and auth.uid()::text = (storage.foldername(name))[1]
+);
+
+drop policy if exists "users update acreta avatars" on storage.objects;
+create policy "users update acreta avatars"
+on storage.objects
+for update
+to authenticated
+using (
+  bucket_id = 'acreta-avatars'
+  and auth.uid()::text = (storage.foldername(name))[1]
+)
+with check (
+  bucket_id = 'acreta-avatars'
+  and auth.uid()::text = (storage.foldername(name))[1]
+);
+
+drop policy if exists "users delete acreta media" on storage.objects;
+create policy "users delete acreta media"
+on storage.objects
+for delete
+to authenticated
+using (
+  bucket_id = 'acreta-media'
+  and auth.uid()::text = (storage.foldername(name))[1]
+);
+
+drop policy if exists "users delete acreta avatars" on storage.objects;
+create policy "users delete acreta avatars"
+on storage.objects
+for delete
+to authenticated
+using (
+  bucket_id = 'acreta-avatars'
+  and auth.uid()::text = (storage.foldername(name))[1]
+);
 
 insert into public.posts (
   group_id,
