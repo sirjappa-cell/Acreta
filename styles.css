@@ -56,8 +56,8 @@ body::after {
   background:
     radial-gradient(circle at 50% 15%, rgba(221, 27, 52, 0.1), transparent 28%),
     radial-gradient(circle at 50% 85%, rgba(83, 33, 143, 0.08), transparent 32%);
-  opacity: 0.45;
-  animation: bodyPulse 14s ease-in-out infinite;
+  opacity: 0.3;
+  animation: bodyPulse 20s ease-in-out infinite;
 }
 
 button,
@@ -91,32 +91,32 @@ button {
     radial-gradient(circle at 30% 40%, rgba(255, 255, 255, 0.04), transparent 20%),
     radial-gradient(circle at 70% 55%, rgba(159, 92, 247, 0.08), transparent 22%),
     radial-gradient(circle at 50% 80%, rgba(221, 27, 52, 0.06), transparent 18%);
-  filter: blur(46px);
-  opacity: 0.45;
+  filter: blur(24px);
+  opacity: 0.28;
 }
 
 .mist--one {
-  animation: drift 20s linear infinite alternate;
+  animation: drift 32s linear infinite alternate;
 }
 
 .mist--two {
-  animation: drift 26s linear infinite alternate-reverse;
+  animation: drift 40s linear infinite alternate-reverse;
 }
 
 .pulse {
   background:
     radial-gradient(circle, rgba(221, 27, 52, 0.09) 0%, rgba(221, 27, 52, 0.02) 22%, transparent 48%);
-  opacity: 0.4;
+  opacity: 0.22;
 }
 
 .pulse--left {
   transform: translate(-30%, -10%);
-  animation: breathe 8s ease-in-out infinite;
+  animation: breathe 14s ease-in-out infinite;
 }
 
 .pulse--right {
   transform: translate(30%, 10%);
-  animation: breathe 11s ease-in-out infinite reverse;
+  animation: breathe 18s ease-in-out infinite reverse;
 }
 
 .rain {
@@ -124,17 +124,17 @@ button {
   background-image: linear-gradient(to bottom, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0));
   background-size: 2px 24px;
   transform: skewX(-12deg);
-  opacity: 0.12;
+  opacity: 0.06;
 }
 
 .rain--back {
-  animation: rainFall 14s linear infinite;
+  animation: rainFall 22s linear infinite;
 }
 
 .rain--front {
   background-size: 3px 32px;
-  opacity: 0.2;
-  animation: rainFall 10s linear infinite;
+  opacity: 0.1;
+  animation: rainFall 16s linear infinite;
 }
 
 .auth-gate {
@@ -476,7 +476,6 @@ button {
   border: 1px solid var(--line);
   border-radius: 20px;
   background: rgba(255, 255, 255, 0.03);
-  backdrop-filter: blur(14px);
 }
 
 .hero__stats article {
@@ -1190,6 +1189,19 @@ textarea {
   margin-top: 14px;
 }
 
+.post-media__preview,
+.post-feed__more {
+  justify-self: start;
+}
+
+.post-media__preview {
+  padding: 14px 16px;
+  border: 1px dashed rgba(255, 255, 255, 0.14);
+  border-radius: 18px;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.025);
+}
+
 .post-media.is-empty {
   display: none;
 }
@@ -1369,6 +1381,20 @@ textarea {
 }
 
 @media (max-width: 1080px) {
+  body::before,
+  body::after,
+  .mist,
+  .pulse,
+  .rain {
+    animation: none;
+  }
+
+  .mist,
+  .pulse,
+  .rain {
+    display: none;
+  }
+
   .layout--reddit {
     grid-template-columns: 1fr;
   }
@@ -1389,6 +1415,25 @@ textarea {
 
   .hero__signals--compact {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  body::before,
+  body::after,
+  .mist,
+  .pulse,
+  .rain {
+    display: none !important;
   }
 }
 

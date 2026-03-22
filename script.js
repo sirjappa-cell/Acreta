@@ -28,6 +28,9 @@ const GROUPS = [
   { id: "pesadelos-reais", nome: "Pesadelos Reais", descricao: "Relatos plausíveis, crimes estranhos e medo do cotidiano." }
 ];
 
+const FEED_BATCH_SIZE = 24;
+const GROUPS_BY_ID = Object.fromEntries(GROUPS.map((group) => [group.id, group]));
+
 const state = {
   selectedGroup: "todos",
   filter: "all",
@@ -38,7 +41,8 @@ const state = {
   votes: {},
   savedPosts: new Set(),
   comments: {},
-  commentsBackendReady: true
+  commentsBackendReady: true,
+  feedLimit: FEED_BATCH_SIZE
 };
 
 const supabaseUrl = window.ACRETA_SUPABASE_URL || "";
@@ -357,6 +361,7 @@ function bindAppEvents() {
 
   searchInputEl.addEventListener("input", () => {
     state.searchTerm = searchInputEl.value.trim().toLowerCase();
+    state.feedLimit = FEED_BATCH_SIZE;
     renderPosts();
   });
 
@@ -569,6 +574,7 @@ function bindAppEvents() {
     button.addEventListener("click", () => {
       withDelay(button, () => {
         state.filter = button.dataset.filter || "all";
+        state.feedLimit = FEED_BATCH_SIZE;
         filterButtons.forEach((item) => item.classList.remove("is-active"));
         button.classList.add("is-active");
         syncActiveNav(state.filter === "all" ? "all" : state.filter);
@@ -618,6 +624,7 @@ function bindAppEvents() {
     event.preventDefault();
     saveComment();
   });
+
 }
 
 async function applySession(session) {
@@ -663,7 +670,7 @@ async function refreshData() {
   }
 
   state.currentProfile = normalizeProfile(profileResult.data, state.currentUser.email || "");
-  state.posts = Array.isArray(postsResult.data) ? postsResult.data : [];
+  state.posts = preparePostsForRender(Array.isArray(postsResult.data) ? postsResult.data : []);
   state.votes = Object.fromEntries((votesResult.data || []).map((vote) => [vote.post_id, vote.value]));
   if (commentsResult.error) {
     state.commentsBackendReady = false;
@@ -728,6 +735,7 @@ function renderGroupControls() {
       withDelay(button, () => {
         state.selectedGroup = group.id;
         state.filter = "all";
+        state.feedLimit = FEED_BATCH_SIZE;
         filterButtons.forEach((item) => item.classList.toggle("is-active", item.dataset.filter === "all"));
         syncActiveGroup();
         syncActiveNav("circles");
@@ -746,6 +754,7 @@ function renderGroupControls() {
     withDelay(allButton, () => {
       state.selectedGroup = "todos";
       state.filter = "all";
+      state.feedLimit = FEED_BATCH_SIZE;
       filterButtons.forEach((item) => item.classList.toggle("is-active", item.dataset.filter === "all"));
       syncActiveGroup();
       syncActiveNav("circles");
@@ -787,6 +796,7 @@ function applyNav(nav) {
 
   state.filter = nav === "all" ? "all" : nav;
   state.selectedGroup = "todos";
+  state.feedLimit = FEED_BATCH_SIZE;
   filterButtons.forEach((item) => item.classList.toggle("is-active", item.dataset.filter === state.filter));
   syncActiveGroup();
   syncActiveNav(nav);
@@ -796,6 +806,7 @@ function applyNav(nav) {
 
 function renderPosts() {
   const visiblePosts = getVisiblePosts();
+  const postsToRender = visiblePosts.slice(0, state.feedLimit);
   const currentGroup = GROUPS.find((group) => group.id === state.selectedGroup);
   feedTitleEl.textContent = getFeedTitle(currentGroup);
 
@@ -808,31 +819,34 @@ function renderPosts() {
     return;
   }
 
-  visiblePosts.forEach((post) => {
+  const fragment = document.createDocumentFragment();
+  postsToRender.forEach((post) => {
     const node = postTemplate.content.firstElementChild.cloneNode(true);
     node.id = `post-${post.id}`;
-    const group = GROUPS.find((item) => item.id === post.group_id);
+    const group = GROUPS_BY_ID[post.group_id];
     const voteState = state.votes[post.id] || 0;
 
     node.querySelector(".vote-score").textContent = post.votes_count;
     node.querySelector(".post-group").textContent = `c/${group?.nome || "Círculo"}`;
     node.querySelector(".post-author").textContent = `por u/${post.author_display}`;
     node.querySelector(".post-author").style.color = post.author_text_color || "#f5eef8";
-    node.querySelector(".post-date").textContent = formatDate(post.created_at);
+    node.querySelector(".post-date").textContent = post._formattedDate || formatDate(post.created_at);
     node.querySelector(".post-owner").textContent = `rastro do autor: ${post.author_username}`;
     node.querySelector(".post-title").textContent = post.title;
     const postTextEl = node.querySelector(".post-text");
     postTextEl.textContent = post.content || "";
     postTextEl.classList.toggle("is-empty", !post.content);
     node.querySelector(".post-avatar").src = post.author_avatar_url || DEFAULT_AVATAR;
-    renderPostMedia(node.querySelector(".post-media"), post);
+    renderPostMedia(node.querySelector(".post-media"), post, "feed");
 
     const upButton = node.querySelector(".vote-button--up");
     const downButton = node.querySelector(".vote-button--down");
+    upButton.dataset.postId = post.id;
+    upButton.dataset.vote = "1";
+    downButton.dataset.postId = post.id;
+    downButton.dataset.vote = "-1";
     upButton.classList.toggle("is-active", voteState === 1);
     downButton.classList.toggle("is-active", voteState === -1);
-    upButton.addEventListener("click", () => handleVote(post.id, 1));
-    downButton.addEventListener("click", () => handleVote(post.id, -1));
 
     const tagsEl = node.querySelector(".post-tags");
     (post.tags || []).forEach((tag) => {
@@ -842,10 +856,24 @@ function renderPosts() {
       tagsEl.appendChild(badge);
     });
 
-    bindPostActions(node, post);
+    hydratePostActionState(node, post);
 
-    postFeedEl.appendChild(node);
+    fragment.appendChild(node);
   });
+
+  postFeedEl.appendChild(fragment);
+
+  if (visiblePosts.length > postsToRender.length) {
+    const loadMoreButton = document.createElement("button");
+    loadMoreButton.type = "button";
+    loadMoreButton.className = "button button--secondary post-feed__more";
+    loadMoreButton.textContent = `Carregar mais relatos (${visiblePosts.length - postsToRender.length} restantes)`;
+    loadMoreButton.addEventListener("click", () => {
+      state.feedLimit += FEED_BATCH_SIZE;
+      renderPosts();
+    });
+    postFeedEl.appendChild(loadMoreButton);
+  }
 }
 
 async function handleVote(postId, value) {
@@ -899,19 +927,7 @@ function getVisiblePosts() {
   }
 
   if (state.searchTerm) {
-    posts = posts.filter((post) => {
-      const haystack = [
-        post.title,
-        post.content,
-        post.author_display,
-        post.author_username,
-        GROUPS.find((group) => group.id === post.group_id)?.nome || "",
-        ...(post.tags || [])
-      ]
-        .join(" ")
-        .toLowerCase();
-      return haystack.includes(state.searchTerm);
-    });
+    posts = posts.filter((post) => (post._searchIndex || "").includes(state.searchTerm));
   }
 
   return posts;
@@ -964,7 +980,7 @@ function getEmptyStateMarkup() {
   `;
 }
 
-function renderPostMedia(container, post) {
+function renderPostMedia(container, post, context = "feed") {
   container.innerHTML = "";
   const imageUrl = post.media_image_url || "";
   const videoUrl = post.media_video_url || "";
@@ -974,24 +990,43 @@ function renderPostMedia(container, post) {
     const image = document.createElement("img");
     image.src = imageUrl;
     image.alt = `Anexo visual do relato ${post.title}`;
+    image.loading = context === "feed" ? "lazy" : "eager";
+    image.decoding = "async";
     container.appendChild(image);
   }
 
   if (videoUrl) {
-    const video = document.createElement("video");
-    video.src = videoUrl;
-    video.controls = true;
-    video.preload = "metadata";
-    container.appendChild(video);
+    if (context === "feed") {
+      const preview = document.createElement("button");
+      preview.type = "button";
+      preview.className = "post-media__preview";
+      preview.textContent = "Video anexado. Abrir registro para assistir.";
+      preview.addEventListener("click", () => openPostModal(post.id));
+      container.appendChild(preview);
+    } else {
+      const video = document.createElement("video");
+      video.src = videoUrl;
+      video.controls = true;
+      video.preload = "metadata";
+      container.appendChild(video);
+    }
   }
 }
 
-function bindPostActions(node, post) {
+function hydratePostActionState(node, post) {
   const saveButton = node.querySelector(".post-action--save");
   const shareButton = node.querySelector(".post-action--share");
   const commentButton = node.querySelector(".post-action--comment");
   const openButton = node.querySelector(".post-action--open");
 
+  saveButton.dataset.postId = post.id;
+  saveButton.dataset.action = "save";
+  shareButton.dataset.postId = post.id;
+  shareButton.dataset.action = "share";
+  commentButton.dataset.postId = post.id;
+  commentButton.dataset.action = "comment";
+  openButton.dataset.postId = post.id;
+  openButton.dataset.action = "open";
   saveButton.classList.toggle("is-active", state.savedPosts.has(post.id));
   saveButton.textContent = state.savedPosts.has(post.id) ? "Salvo" : "Salvar";
   saveButton.addEventListener("click", () => {
@@ -1451,6 +1486,27 @@ function mapCommentRecord(comment) {
   };
 }
 
+function preparePostsForRender(posts) {
+  return posts.map((post) => {
+    const group = GROUPS_BY_ID[post.group_id];
+    return {
+      ...post,
+      _formattedDate: formatDate(post.created_at),
+      _groupLabel: `c/${group?.nome || "Circulo"}`,
+      _searchIndex: [
+        post.title,
+        post.content,
+        post.author_display,
+        post.author_username,
+        group?.nome || "",
+        ...(post.tags || [])
+      ]
+        .join(" ")
+        .toLowerCase()
+    };
+  });
+}
+
 function normalizeLegacyCommentState(commentsByPost) {
   return Object.fromEntries(
     Object.entries(commentsByPost).map(([postId, comments]) => [
@@ -1603,7 +1659,8 @@ function triggerThunder() {
 }
 
 function withDelay(element, callback) {
-  const wait = 50 + Math.floor(Math.random() * 101);
+  const prefersReducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+  const wait = prefersReducedMotion ? 0 : 8;
   element.classList.add("is-delaying");
   return new Promise((resolve) => {
     window.setTimeout(async () => {
